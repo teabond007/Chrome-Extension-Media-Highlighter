@@ -35,7 +35,7 @@ export const useLibraryStore = defineStore('library', {
             console.log("[LibraryStore] loadLibrary function has started!");
             this.isLoading = true;
             try {
-                console.log("[LibraryStore] Loading library data keys from chrome storage...");
+             
                 const data = await chrome.storage.local.get([
                     DATA.LIBRARY_ENTRIES, 
                     DATA.READING_HISTORY, 
@@ -279,7 +279,7 @@ export const useLibraryStore = defineStore('library', {
                 alert(wipeAll ? "Full library sync completed!" : "Missing info sync completed!");
             } catch (e) {
                 console.error("Sync failed:", e);
-                alert("Sync failed. Check console for details.");
+               
             } finally {
                 this.isSyncing = false;
                 this.syncProgress = { current: 0, total: 0, title: '' };

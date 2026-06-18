@@ -107,9 +107,7 @@ onMounted(async () => {
     setupScrollTopListener();
 });
 
-/**
- * Handle deep linking params (e.g. #library?showDetails=...)
- */
+
 const handleUrlParams = () => {
     const hash = window.location.hash;
     if (!hash) return;

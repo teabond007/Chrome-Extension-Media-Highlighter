@@ -195,7 +195,7 @@ export async function upsertEntry(entryData) {
         console.log("[LibraryService] Saved successfully!");
         return updatedEntry;
     } catch (err) {
-        console.log("[LibraryService] Error in upsertEntry: " + err);
+        console.log("[LibraryService] Error: " + err);
         return null;
     }
 }

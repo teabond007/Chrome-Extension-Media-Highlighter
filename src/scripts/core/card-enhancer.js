@@ -55,28 +55,26 @@ export class CardEnhancer {
     async enhanceAll() {
         console.log("[CardEnhancer] Starting the enhanceAll function now!");
         if (!chrome.runtime?.id) {
-            console.log('[CardEnhancer] Context is bad, we cannot enhance.');
             return 0;
         }
 
         try {
-            console.log("[CardEnhancer] Finding all the cards on the page...");
+            
             var cards = this.findCards();
             console.log("[CardEnhancer] We found " + cards.length + " cards on this page.");
             
-            console.log("[CardEnhancer] Getting library entries and read chapters from storage...");
+       
             var storageData = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES, DATA.READING_HISTORY]);
             
             var library = [];
             if (Array.isArray(storageData[DATA.LIBRARY_ENTRIES])) {
                 library = storageData[DATA.LIBRARY_ENTRIES];
-            } else {
-                console.log("[CardEnhancer] Library entries in storage was not an array, using empty list.");
             }
+            
 
             var readChapters = storageData[DATA.READING_HISTORY] || {};
 
-            console.log("[CardEnhancer] Processing history for each library entry...");
+            // Attach read chapter data to each library entry
             for (var k = 0; k < library.length; k++) {
                 var entry = library[k];
                 if (entry && entry.title) {
@@ -92,24 +90,23 @@ export class CardEnhancer {
 
             var enhancedCount = 0;
 
-            console.log("[CardEnhancer] Looping through all the cards to enhance them...");
+            // Loop through each card and try to find a match in the library
             for (var i = 0; i < cards.length; i++) {
                 var card = cards[i];
 
                 try {
                     if (card.element.dataset.bmhEnhanced) {
-                        console.log("[CardEnhancer] Card is already enhanced, skipping: " + card.data.title);
                         continue;
                     }
 
-                    console.log("[CardEnhancer] Looking for match for card: " + card.data.title);
+                    
                     var match = this.findMatch(card, library);
 
                     if (match) {
-                        console.log("[CardEnhancer] Card matched an entry in library! Applying enhancements.");
+                       
                         this.applyEnhancements(card, match);
                     } else if (this.settings.quickActions) {
-                        console.log("[CardEnhancer] Card is new! Creating a skeleton entry for: " + card.data.title);
+                       
                         var skeletonEntry = {
                             title: card.data.title,
                             slug: card.data.id,
@@ -124,14 +121,14 @@ export class CardEnhancer {
                     card.element.dataset.bmhEnhanced = 'true';
                     enhancedCount = enhancedCount + 1;
                 } catch (cardError) {
-                    console.log('[CardEnhancer] Single card error occurred: ' + cardError);
+                    console.log('[CardEnhancer]error aaa: ' + cardError);
                 }
             }
 
             console.log("[CardEnhancer] Done enhancing cards! Total enhanced in this run: " + enhancedCount);
             return enhancedCount;
         } catch (err) {
-            console.log('[CardEnhancer] Oh no! Global enhancement error: ' + err);
+            console.log('[CardEnhancer] error: ' + err);
             return 0;
         }
     }
@@ -214,10 +211,10 @@ export class CardEnhancer {
      * @returns {Object|undefined}
      */
     findMatch(card, library) {
-        console.log("[CardEnhancer] Starting findMatch for: " + card.data.title);
+      
         try {
             var normalizedCardTitle = this.normalizeTitle(card.data.title);
-            console.log("[CardEnhancer] Card title normalized is: " + normalizedCardTitle);
+           
             
             // Loop through all entries to see if we find a title that matches
             for (var i = 0; i < library.length; i++) {
@@ -226,13 +223,13 @@ export class CardEnhancer {
                 var normalizedEntryTitle = this.normalizeTitle(entryTitle);
                 
                 if (normalizedEntryTitle === normalizedCardTitle) {
-                    console.log("[CardEnhancer] Wow, we found a match in the library! Title is: " + entry.title);
+                
                     return entry;
                 }
             }
-            console.log("[CardEnhancer] We did not find any match for: " + card.data.title);
+            
         } catch (e) {
-            console.log("[CardEnhancer] Oh no! Something went wrong in findMatch: " + e);
+            console.log("[CardEnhancer] error in findMatch: " + e);
         }
         return undefined;
     }
@@ -244,20 +241,20 @@ export class CardEnhancer {
      * @param {Object} entry - Library entry
      */
     applyEnhancements(card, entry) {
-        console.log("[CardEnhancer] applyEnhancements called for: " + entry.title);
+       
         try {
             if (this.settings.highlighting) {
-                console.log("[CardEnhancer] Library borders enabled, calling applyBorder");
+               
                 this.applyBorder(card, entry);
             }
 
             if (this.settings.quickActions) {
-                console.log("[CardEnhancer] Quick actions enabled, calling applyQuickActions");
+              
                 this.applyQuickActions(card, entry);
             }
 
             if (this.settings.showRibbons) {
-                console.log("[CardEnhancer] Show ribbons enabled, calling applyRibbon");
+               
                 this.applyRibbon(card, entry);
             }
         } catch (err) {
@@ -414,10 +411,10 @@ export class CardEnhancer {
 
             if (lastUrl.indexOf(searchStr1) != -1) {
                 url = lastUrl.replace(searchStr1, "/" + nextChapter);
-                console.log('[CardEnhancer] URL updated (type 1): ' + url);
+               
             } else if (lastUrl.indexOf(searchStr2) != -1) {
                 url = lastUrl.replace(searchStr2, "-" + nextChapter);
-                console.log('[CardEnhancer] URL updated (type 2): ' + url);
+         
             } else {
                 // Can't find the chapter in URL — just go back to the last read page
                 url = lastUrl;
@@ -498,7 +495,7 @@ export class CardEnhancer {
                 // Entry already exists — just update its status in place
                 entries[foundIdx].status = newStatus;
                 entries[foundIdx].lastUpdated = Date.now();
-                console.log('[CardEnhancer] Updated existing entry status: ' + entry.title + ' → ' + newStatus);
+             
             } else {
                 // Entry is new — build it and try to fetch metadata before saving
                 var newEntry = {
@@ -517,7 +514,7 @@ export class CardEnhancer {
                         newEntry.anilistData = metadata;
                     }
                 } catch (e) {
-                    console.warn('[CardEnhancer] Failed to fetch metadata for quick action', e);
+                    console.warn('[CardEnhancer] error:', e);
                 }
 
                 entries.push(newEntry);

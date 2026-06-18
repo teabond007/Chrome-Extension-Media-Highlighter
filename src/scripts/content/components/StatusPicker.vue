@@ -46,7 +46,7 @@ const defaultStatuses = [
 ];
 
 const allStatuses = computed(() => {
-  console.log("[StatusPicker] computed allStatuses has triggered!");
+  console.log("[StatusPicker] computed allStatuses");
   var merged = [];
   
   // Use simple loops to merge arrays
@@ -74,7 +74,7 @@ const onSelect = (statusName) => {
     console.log("[StatusPicker] Emitting select event...");
     emit('select', statusName);
   } catch (err) {
-    console.log("[StatusPicker] Oh no! Error in onSelect click handler: " + err);
+    console.log("[StatusPicker]Error in onSelect click handler: " + err);
   }
 };
 </script>

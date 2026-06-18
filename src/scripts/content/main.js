@@ -79,9 +79,7 @@ function bootstrap() {
 }
 
 // Prevent multiple initializations in the same window
-if (window.__BMH_INITIALIZED__) {
-    console.log('[BMH] already initialized on this page, skipping');
-} else {
+if (!window.__BMH_INITIALIZED__) {
     window.__BMH_INITIALIZED__ = true;
 
     // Initialize when the DOM is ready

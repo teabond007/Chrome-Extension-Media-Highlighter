@@ -26,7 +26,7 @@
             </div>
 
 
-
+            <!-- Buttton for continuing reading -->
             <div class="manga-card-actions">
                 <a 
                     v-if="entry[LIBRARY_ENTRY_KEYS.LAST_READER_URL] && (entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER] || entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER] === 0)" 

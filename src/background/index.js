@@ -1,5 +1,5 @@
 /**
- * @fileoverview Background Service Worker for Bookmarks Marker/Highlighter Extension
+ * @fileoverview Main background file, centralizer and initalizer for the extension.
  * Acts as central message router and orchestrates site-specific scrapers.
  */
 
@@ -13,7 +13,6 @@ chrome.action.onClicked.addListener(() => {
 
 /**
  * Central message listener that routes messages to appropriate handlers.
- * Supports MangaFire scraping operations and auto-sync functionality.
  */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "showMangaDetails") {

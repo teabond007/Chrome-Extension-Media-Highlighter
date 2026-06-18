@@ -122,10 +122,7 @@ function transformToAnilistFormat(mdManga) {
   
   if (coverRel && coverRel.attributes && coverRel.attributes.fileName) {
     coverUrl = `https://uploads.mangadex.org/covers/${mdManga.id}/${coverRel.attributes.fileName}.256.jpg`;
-  } else if (coverRel && coverRel.id) {
-    // Fallback: try to use the cover ID directly (less reliable)
-    console.log(`[MangaDex] ⚠️ Cover relationship exists but no fileName for ${mdManga.id}`);
-  }
+  } 
   
   // Use placeholder if no cover found
   if (!coverUrl) {
@@ -218,16 +215,16 @@ function transformToAnilistFormat(mdManga) {
  * @returns {Promise<object|null>} Manga data in AniList-compatible format, or null if not found.
  */
 export async function fetchMangaFromMangadex(title, retryCount = 0) {
-  console.log(`[MangaDex] 🔍 Searching for: "${title}" (attempt ${retryCount + 1})`);
+  console.log(`[MangaDex] Searching for: "${title}" (attempt ${retryCount + 1})`);
   
   // Check cache first
   const cached = await getCachedData(title);
   if (cached !== null) {
     if (cached.status === 'NOT_FOUND') {
-      console.log(`[MangaDex] ⏭️ Cache hit: "${title}" marked as NOT_FOUND, skipping`);
+      console.log(`[MangaDex] yeah... no: "${title}" marked as NOT_FOUND, skipping`);
       return null;
     }
-    console.log(`[MangaDex] ✅ Cache hit: "${title}" - returning cached data`);
+    console.log(`[MangaDex] it works: "${title}" - returning cached data`);
     return cached;
   }
 
@@ -248,7 +245,7 @@ export async function fetchMangaFromMangadex(title, retryCount = 0) {
   const baseUrl = `${MANGADEX_API_URL}/manga`;
   const queryString = `title=${encodeURIComponent(searchTitle)}&limit=10&includes[]=cover_art&includes[]=author&order[relevance]=desc`;
   const url = `${baseUrl}?${queryString}`;
-  console.log(`[MangaDex] 🌐 API Request: ${url}`);
+  console.log(`[MangaDex] API Request: ${url}`);
 
   try {
     const response = await fetch(url, {
@@ -302,10 +299,9 @@ export async function fetchMangaFromMangadex(title, retryCount = 0) {
     const bestMatch = data.data[0];
     const transformedData = transformToAnilistFormat(bestMatch);
     
-    console.log(`[MangaDex] ✅ Found: "${transformedData.title.english}" (ID: ${transformedData.mangadexId})`);
-    console.log(`[MangaDex] 📊 Format: ${transformedData.format}, Status: ${transformedData.status}, Chapters: ${transformedData.chapters || 'N/A'}`);
+    console.log(`[MangaDex] Found: "${transformedData.title.english}" (ID: ${transformedData.mangadexId})`);
+    console.log(`[MangaDex] More info: ${transformedData.format}, Status: ${transformedData.status}, Chapters: ${transformedData.chapters || 'N/A'}`);
     
-    // Cache the result
     await setCachedData(title, transformedData);
     
     return transformedData;
@@ -332,9 +328,9 @@ export async function cleanMangadexCache() {
       const now = Date.now();
       let removed = 0;
       
-      Object.keys(cache).forEach(key => {
-        if (now - cache[key].timestamp > CACHE_EXPIRY_MS) {
-          delete cache[key];
+      Object.keys(cache).forEach(i => {
+        if (now - cache[i].timestamp > CACHE_EXPIRY_MS) {
+          delete cache[i];
           removed++;
         }
       });
@@ -346,6 +342,7 @@ export async function cleanMangadexCache() {
 
 /**
  * Clears all entries from the MangaDex cache immediately.
+ * for erase & sync all button in library)
  * @async
  * @returns {Promise<void>}
  */
