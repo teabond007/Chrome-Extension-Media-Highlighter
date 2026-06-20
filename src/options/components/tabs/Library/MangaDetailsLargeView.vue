@@ -31,7 +31,7 @@
                         </div>
                         <div class="meta-row">
                             <span class="meta-label">Progress</span>
-                            <div class="meta-value">{{ entry.readChapters || 0 }} / {{ ani?.chapters || '?' }}</div>
+                            <div class="meta-value">{{ entry.readChapters || 0 }} / {{ entry.type === 'anime' ? (ani?.episodes || '?') : (ani?.chapters || '?') }}</div>
                         </div>
                     </div>
                 </div>
@@ -48,7 +48,7 @@
                     
                     <div class="card-actions" @click.stop>
                         <a v-if="entry.lastReaderUrl" :href="entry.lastReaderUrl" target="_blank" class="btn btn-primary btn-sm">
-                            Continue Reading
+                            {{ entry.type === 'anime' ? 'Continue Watching' : 'Continue Reading' }}
                         </a>
                         <a v-if="ani?.siteUrl" :href="ani.siteUrl" target="_blank" class="btn btn-ghost btn-sm">
                             AniList

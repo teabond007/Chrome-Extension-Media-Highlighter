@@ -12,9 +12,9 @@ var ANILIST_API_URL = API_CONFIG.ANILIST.BASE_URL;
 // This is the query we send to Anilist to get the manga data
 // It asks for things like titles, cover images, genres and descriptions
 var graphQLQuery = `
-query ($search: String) {
+query ($search: String, $type: MediaType) {
   Page (page: 1, perPage: 1) {
-    media (search: $search, type: MANGA) {
+    media (search: $search, type: $type) {
       id
       title {
         romaji
@@ -36,6 +36,7 @@ query ($search: String) {
       status
       chapters
       volumes
+      episodes
       siteUrl
       averageScore
       popularity
@@ -96,7 +97,7 @@ function cleanTitle(title, aggressive) {
             "colored", "remake", "full color", "digital",
             "vertical", "scanlation", "official", "ver",
             "manga", "manhwa", "manhua", "remastered",
-            "raw", "chapter"
+            "raw", "chapter", "episode", "ep", "sub", "dub", "season"
         ];
         
         for (var i = 0; i < wordsToRemove.length; i++) {
@@ -119,7 +120,7 @@ function cleanTitle(title, aggressive) {
  * @param {string} title - The title of the manga to search for
  * @param {number} attempt - Which try this is (starts at 0)
  */
-export async function fetchMangaFromAnilist(title, attempt = 0) {
+export async function fetchMangaFromAnilist(title, attempt = 0, mediaType = 'manga') {
     // We check if we need to wait a bit before the next request
     var now = Date.now();
     var timeDiff = now - lastRequestTime;
@@ -133,9 +134,18 @@ export async function fetchMangaFromAnilist(title, attempt = 0) {
     if (attempt == 1) {
         // Try cleaning simple things
         searchTitle = cleanTitle(title, false);
-    } else if (attempt >= 2) {
+    } else if (attempt == 2) {
         // Try cleaning everything
         searchTitle = cleanTitle(title, true);
+    } else if (attempt >= 3) {
+        // Extra aggressive: strip season numbers, part numbers, and trailing digits/ordinals
+        searchTitle = cleanTitle(title, false)
+            .replace(/\bseason\s*\d+\b/gi, '')
+            .replace(/\b\d+(?:st|nd|rd|th)\s*season\b/gi, '')
+            .replace(/\bs\d+\b/gi, '')
+            .replace(/\bpart\s*\d+\b/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     var fetchOptions = {
@@ -148,7 +158,8 @@ export async function fetchMangaFromAnilist(title, attempt = 0) {
             //graphQLQuery contains json with what to search for/ to recieve
             query: graphQLQuery,
             variables: {
-                search: searchTitle
+                search: searchTitle,
+                type: mediaType === 'anime' ? 'ANIME' : 'MANGA'
             }
         })
     };
@@ -158,10 +169,10 @@ export async function fetchMangaFromAnilist(title, attempt = 0) {
 
         // 429 means we are making too many requests
         if (response.status == 429) {
-            if (attempt < 3) {
+            if (attempt < 4) {
                 console.log("Anilist rate limit reached. Waiting 5 seconds before retry...");
                 await wait(5000);
-                return fetchMangaFromAnilist(title, attempt + 1);
+                return fetchMangaFromAnilist(title, attempt + 1, mediaType);
             }
             return null;
         }
@@ -169,9 +180,9 @@ export async function fetchMangaFromAnilist(title, attempt = 0) {
         // If the server has a problem we wait and try again
         if (response.ok == false) {
             console.log("Anilist API error: " + response.status);
-            if (attempt < 2) {
+            if (attempt < 3) {
                 await wait(2000);
-                return fetchMangaFromAnilist(title, attempt + 1);
+                return fetchMangaFromAnilist(title, attempt + 1, mediaType);
             }
             return null;
         }
@@ -180,8 +191,8 @@ export async function fetchMangaFromAnilist(title, attempt = 0) {
 
         // If there are errors in the GraphQL response
         if (result.errors) {
-            if (attempt < 2) {
-                return fetchMangaFromAnilist(title, attempt + 1);
+            if (attempt < 3) {
+                return fetchMangaFromAnilist(title, attempt + 1, mediaType);
             }
             return null;
         }
@@ -191,18 +202,20 @@ export async function fetchMangaFromAnilist(title, attempt = 0) {
             
             if (items.length == 0) {
                 // If we found nothing, try the next attempt with more cleaning
-                if (attempt < 2) {
-                    return fetchMangaFromAnilist(title, attempt + 1);
+                if (attempt < 3) {
+                    return fetchMangaFromAnilist(title, attempt + 1, mediaType);
                 }
                 return null;
             }
 
             // We look for a result that is actually a Manga (not a novel or one-shot)
             var chosenItem = items[0];
-            for (var k = 0; k < items.length; k++) {
-                if (items[k].format == 'MANGA') {
-                    chosenItem = items[k];
-                    break;
+            if (mediaType === 'manga') {
+                for (var k = 0; k < items.length; k++) {
+                    if (items[k].format == 'MANGA') {
+                        chosenItem = items[k];
+                        break;
+                    }
                 }
             }
             
@@ -216,9 +229,9 @@ export async function fetchMangaFromAnilist(title, attempt = 0) {
         console.log(error);
         
         // Try again if we can
-        if (attempt < 2) {
+        if (attempt < 3) {
             await wait(2000);
-            return fetchMangaFromAnilist(title, attempt + 1);
+            return fetchMangaFromAnilist(title, attempt + 1, mediaType);
         }
         return null;
     }

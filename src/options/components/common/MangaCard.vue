@@ -34,9 +34,9 @@
                     target="_blank" 
                     class="card-action-btn card-action-continue"
                     @click.stop
-                    :title="'Continue reading Ch.' + (entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER] || '?')"
+                    :title="(isAnime ? 'Continue watching Ep.' : 'Continue reading Ch.') + (entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER] || '?')"
                 >
-                    ▶ Ch.{{ entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER] || '?' }}
+                    ▶ {{ unitLabel }}{{ entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER] || '?' }}
                 </a>
             </div>
         </div>
@@ -147,7 +147,8 @@ const formatName = computed(() => {
     return getFormatName(props.entry.anilistData.format, props.entry.anilistData.countryOfOrigin);
 });
 
-
+const isAnime = computed(() => props.entry.type === 'anime');
+const unitLabel = computed(() => isAnime.value ? 'Ep.' : 'Ch.');
 </script>
 
 <style scoped lang="scss">

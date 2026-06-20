@@ -14,7 +14,7 @@ import { STATUS_COLORS } from '../../../config.js';
  * @returns {Object} An object containing borderColor, borderStyle, badgeBg, and badgeText keys.
  */
 export function getStatusInfo(status, customStatusName, customStatuses) {
-    const statusLower = status.toLowerCase();
+    const statusLower = (status || '').toLowerCase().trim();
     
     // Check if an explicit custom status is assigned
     let matched = customStatusName ? customStatuses.find(m => m.name === customStatusName) : null;
@@ -33,25 +33,34 @@ export function getStatusInfo(status, customStatusName, customStatuses) {
         };
     }
 
-    // Keyword matching for status categorization
-    let type = "default";
-    if (statusLower.includes("reading")) type = "reading";
-    else if (statusLower === "read") type = "read";
-    else if (statusLower.includes("completed")) type = "completed";
-    else if (statusLower.includes("dropped")) type = "dropped";
-    else if (statusLower.includes("hold")) type = "onhold";
-    else if (statusLower.includes("plan")) type = "planning";
+    // Direct lookup in STATUS_COLORS config
+    let color = null;
+    for (const [key, val] of Object.entries(STATUS_COLORS)) {
+        if (key.toLowerCase() === statusLower) {
+            color = val;
+            break;
+        }
+    }
 
-    const config = {
-        color: STATUS_COLORS[type] || STATUS_COLORS.default,
-        bg: `${STATUS_COLORS[type] || STATUS_COLORS.default}26`
-    };
+    // Fallback: keyword matching for status categorization
+    if (!color) {
+        let type = "default";
+        if (statusLower.includes("re-reading") || statusLower.includes("re-watching")) type = "re-watching";
+        else if (statusLower.includes("reading") || statusLower.includes("watching")) type = "reading";
+        else if (statusLower === "read") type = "read";
+        else if (statusLower.includes("completed")) type = "completed";
+        else if (statusLower.includes("dropped")) type = "dropped";
+        else if (statusLower.includes("hold")) type = "onhold";
+        else if (statusLower.includes("plan")) type = "planning";
+        
+        color = STATUS_COLORS[type] || STATUS_COLORS.default;
+    }
 
     return {
-        borderColor: config.color,
+        borderColor: color,
         borderStyle: "solid",
-        badgeBg: config.bg,
-        badgeText: config.color
+        badgeBg: `${color}26`,
+        badgeText: color
     };
 }
 
@@ -70,9 +79,16 @@ export function getFormatName(format, country) {
     const formats = {
         'MANGA': 'Manga',
         'ONE_SHOT': 'One Shot',
-        'NOVEL': 'Light Novel'
+        'NOVEL': 'Light Novel',
+        'TV': 'TV Show',
+        'TV_SHORT': 'TV Short',
+        'MOVIE': 'Movie',
+        'SPECIAL': 'Special',
+        'OVA': 'OVA',
+        'ONA': 'ONA',
+        'MUSIC': 'Music'
     };
-    return formats[format] || 'Manga';
+    return formats[format] || format || 'Unknown';
 }
 
 

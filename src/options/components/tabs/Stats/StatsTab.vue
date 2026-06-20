@@ -1,9 +1,32 @@
 <template>
     <div id="tab-stats" class="tab-pane fade-in" :class="{ active: settingsStore.activeTab === 'stats' }">
-        <header class="header">
+        <header class="header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
             <div class="header-text">
                 <h1>Library Statistics</h1>
                 <p class="subtitle">Overview of your reading journey, progress milestones, and library insights.</p>
+            </div>
+            <div class="stats-segmented-control">
+                <button 
+                    @click="activeStatsType = 'all'" 
+                    class="control-btn" 
+                    :class="{ active: activeStatsType === 'all' }"
+                >
+                    <span class="icon-svg icon-globe" style="font-size: 14px;"></span> All Media
+                </button>
+                <button 
+                    @click="activeStatsType = 'manga'" 
+                    class="control-btn" 
+                    :class="{ active: activeStatsType === 'manga' }"
+                >
+                    <span class="icon-svg icon-library" style="font-size: 14px;"></span> Manga
+                </button>
+                <button 
+                    @click="activeStatsType = 'anime'" 
+                    class="control-btn" 
+                    :class="{ active: activeStatsType === 'anime' }"
+                >
+                    <span class="icon-svg icon-video" style="font-size: 14px;"></span> Anime
+                </button>
             </div>
         </header>
 
@@ -12,11 +35,11 @@
             <div class="stats-overview-grid">
                 <div class="stat-widget">
                     <div class="stat-widget-icon icon-bg-blue">
-                        <span class="icon-svg icon-library"></span>
+                        <span class="icon-svg" :class="activeStatsType === 'anime' ? 'icon-video' : 'icon-library'"></span>
                     </div>
                     <div class="stat-widget-data">
                         <span class="stat-number">{{ stats.totalManga }}</span>
-                        <span class="stat-label">Total Manga</span>
+                        <span class="stat-label">{{ activeStatsType === 'anime' ? 'Total Anime' : (activeStatsType === 'manga' ? 'Total Manga' : 'Total Entries') }}</span>
                     </div>
                 </div>
                 <div class="stat-widget">
@@ -25,7 +48,7 @@
                     </div>
                     <div class="stat-widget-data">
                         <span class="stat-number">{{ stats.totalChapters }}</span>
-                        <span class="stat-label">Chapters Read</span>
+                        <span class="stat-label">{{ activeStatsType === 'anime' ? 'Episodes Watched' : 'Chapters Read' }}</span>
                     </div>
                 </div>
                 <div class="stat-widget">
@@ -91,7 +114,7 @@
                                     <div class="genre-header">
                                         <span class="genre-rank">#{{ idx + 1 }}</span>
                                         <span class="genre-name">{{ genre.name }}</span>
-                                        <span class="genre-count">{{ genre.count }} manga</span>
+                                        <span class="genre-count">{{ genre.count }} {{ activeStatsType === 'anime' ? 'anime' : (activeStatsType === 'manga' ? 'manga' : 'entries') }}</span>
                                     </div>
                                     <div class="progress-bar-container">
                                         <div 
@@ -105,7 +128,7 @@
                                 </div>
                             </div>
                             <div v-else class="empty-state-sub">
-                                <p>No genre data available. Sync Anilist metadata in your library to see genre insights.</p>
+                                <p>No genre data available. Sync AniList metadata in your library to see genre insights.</p>
                             </div>
                         </div>
                     </div>
@@ -114,7 +137,7 @@
                     <div class="stats-card">
                         <div class="card-header">
                             <span class="icon-svg icon-globe card-header-icon" style="color: var(--accent-primary);"></span>
-                            <h3>Reading Sources</h3>
+                            <h3>{{ activeStatsType === 'anime' ? 'Watching Sources' : 'Reading Sources' }}</h3>
                         </div>
                         <div class="card-body">
                             <div class="source-list">
@@ -161,7 +184,7 @@
                                                     height: getRatingBarHeight(stats.ratingDist[score]) + '%',
                                                     opacity: stats.ratingDist[score] > 0 ? '1' : '0.15'
                                                 }"
-                                                :title="stats.ratingDist[score] + ' manga rated ' + score"
+                                                :title="stats.ratingDist[score] + (activeStatsType === 'anime' ? ' anime' : (activeStatsType === 'manga' ? ' manga' : ' entries')) + ' rated ' + score"
                                             >
                                                 <span class="rating-bar-tooltip" v-if="stats.ratingDist[score] > 0">
                                                     {{ stats.ratingDist[score] }}
@@ -173,10 +196,10 @@
                                 </div>
                             </div>
                             <div class="ratings-summary" v-if="stats.ratedMangaCount > 0">
-                                <p>You have rated <strong>{{ stats.ratedMangaCount }}</strong> out of <strong>{{ stats.totalManga }}</strong> manga entries in your library.</p>
+                                <p>You have rated <strong>{{ stats.ratedMangaCount }}</strong> out of <strong>{{ stats.totalManga }}</strong> {{ activeStatsType === 'anime' ? 'anime' : (activeStatsType === 'manga' ? 'manga' : 'media') }} entries in your library.</p>
                             </div>
                             <div class="ratings-summary-empty" v-else>
-                                <p>Give ratings to your saved manga to populate your rating histogram profile.</p>
+                                <p>Give ratings to your saved {{ activeStatsType === 'anime' ? 'anime' : 'manga' }} to populate your rating histogram profile.</p>
                             </div>
                         </div>
                     </div>
@@ -185,7 +208,7 @@
                     <div class="stats-card">
                         <div class="card-header">
                             <span class="icon-svg icon-target card-header-icon" style="color: var(--accent-primary);"></span>
-                            <h3>Most Read Manga</h3>
+                            <h3>{{ activeStatsType === 'anime' ? 'Most Watched Anime' : 'Most Read Manga' }}</h3>
                         </div>
                         <div class="card-body">
                             <div v-if="stats.topReadManga.length > 0" class="top-read-list">
@@ -195,12 +218,12 @@
                                         <span class="top-read-title">{{ manga.title }}</span>
                                     </div>
                                     <div class="top-read-badge">
-                                        {{ manga.count }} chapters
+                                        {{ manga.count }} {{ activeStatsType === 'anime' ? 'episodes' : 'chapters' }}
                                     </div>
                                 </div>
                             </div>
                             <div v-else class="empty-state-sub">
-                                <p>No chapter history found. Start reading chapters on custom sites to track chapter counts.</p>
+                                <p>No {{ activeStatsType === 'anime' ? 'episode' : 'chapter' }} history found. Start {{ activeStatsType === 'anime' ? 'watching episodes' : 'reading chapters' }} on custom sites to track counts.</p>
                             </div>
                         </div>
                     </div>
@@ -209,20 +232,20 @@
                     <div class="stats-card">
                         <div class="card-header">
                             <span class="icon-svg icon-book-open card-header-icon" style="color: var(--accent-primary);"></span>
-                            <h3>Recent Reading Activity</h3>
+                            <h3>{{ activeStatsType === 'anime' ? 'Recent Watching Activity' : 'Recent Reading Activity' }}</h3>
                         </div>
                         <div class="card-body">
                             <div v-if="stats.topRecentReads.length > 0" class="recent-reads-list">
                                 <div v-for="manga in stats.topRecentReads" :key="manga.title" class="recent-read-item">
                                     <div class="recent-read-info">
                                         <span class="recent-read-title">{{ manga.title }}</span>
-                                        <span class="recent-read-chapter" v-if="manga.lastReadChapter">Read Ch. {{ manga.lastReadChapter }}</span>
+                                        <span class="recent-read-chapter" v-if="manga.lastReadChapter">{{ manga.type === 'anime' ? 'Watched Ep. ' : 'Read Ch. ' }}{{ manga.lastReadChapter }}</span>
                                     </div>
                                     <span class="recent-read-time">{{ formatRelativeTime(manga.lastRead) }}</span>
                                 </div>
                             </div>
                             <div v-else class="empty-state-sub">
-                                <p>No reading activity tracked yet.</p>
+                                <p>No {{ activeStatsType === 'anime' ? 'watching' : 'reading' }} activity tracked yet.</p>
                             </div>
                         </div>
                     </div>
@@ -231,20 +254,22 @@
         </div>
 
         <div class="empty-state-main" v-else>
-            <span class="icon-svg icon-library empty-icon"></span>
+            <span class="icon-svg empty-icon" :class="activeStatsType === 'anime' ? 'icon-video' : 'icon-library'"></span>
             <h2>No Statistics Available Yet</h2>
-            <p>Add manga entries to your library or start reading chapters to begin generating statistics insights.</p>
+            <p>Add {{ activeStatsType === 'anime' ? 'anime' : 'manga' }} entries to your library or start {{ activeStatsType === 'anime' ? 'watching episodes' : 'reading chapters' }} to begin generating statistics insights.</p>
         </div>
     </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { useSettingsStore } from '../../../scripts/store/settings.store.js';
 import { useLibraryStore } from '../../../scripts/store/library.store.js';
 
 const settingsStore = useSettingsStore();
 const libraryStore = useLibraryStore();
+
+const activeStatsType = ref('all');
 
 /**
  * Normalizes title strings for matching/slugification.
@@ -306,10 +331,13 @@ const getRatingBarHeight = (count) => {
  */
 const getStatusColor = (status) => {
     switch (status) {
-        case 'Reading': return '#4318FF'; // Theme primary accent
+        case 'Reading':
+        case 'Watching': return '#4318FF'; // Theme primary accent
         case 'Completed': return '#10b981'; // Success emerald
-        case 'Plan to Read': return '#a855f7'; // Purple
-        case 'On Hold': return '#FFB547'; // Warning gold
+        case 'Plan to Read':
+        case 'Plan to Watch': return '#a855f7'; // Purple
+        case 'On Hold':
+        case 'On-Hold': return '#FFB547'; // Warning gold
         case 'Dropped': return '#EE5D50'; // Danger red
         default: return 'var(--accent-secondary)';
     }
@@ -319,9 +347,17 @@ const getStatusColor = (status) => {
  * Main computed statistics object gathering raw metrics from the store state.
  */
 const stats = computed(() => {
-    const list = libraryStore.entries || [];
+    const allList = libraryStore.entries || [];
     const hist = libraryStore.history || {};
     const personal = libraryStore.personalData || {};
+    
+    // Filter list based on toggle
+    const list = allList.filter(e => {
+        if (!e) return false;
+        if (activeStatsType.value === 'manga') return e.type !== 'anime';
+        if (activeStatsType.value === 'anime') return e.type === 'anime';
+        return true;
+    });
     
     // 1. Basic Counts
     const totalManga = list.length;
@@ -332,31 +368,62 @@ const stats = computed(() => {
     let droppedCount = 0;
     
     // Status distribution map
-    const statusCounts = {
-        'Reading': 0,
-        'Completed': 0,
-        'Plan to Read': 0,
-        'On Hold': 0,
-        'Dropped': 0
-    };
+    const statusCounts = {};
+    if (activeStatsType.value === 'anime') {
+        statusCounts['Watching'] = 0;
+        statusCounts['Completed'] = 0;
+        statusCounts['Plan to Watch'] = 0;
+        statusCounts['On Hold'] = 0;
+        statusCounts['Dropped'] = 0;
+    } else if (activeStatsType.value === 'manga') {
+        statusCounts['Reading'] = 0;
+        statusCounts['Completed'] = 0;
+        statusCounts['Plan to Read'] = 0;
+        statusCounts['On Hold'] = 0;
+        statusCounts['Dropped'] = 0;
+    } else {
+        statusCounts['Reading'] = 0;
+        statusCounts['Watching'] = 0;
+        statusCounts['Completed'] = 0;
+        statusCounts['Plan to Read'] = 0;
+        statusCounts['Plan to Watch'] = 0;
+        statusCounts['On Hold'] = 0;
+        statusCounts['Dropped'] = 0;
+    }
     
     for (var i = 0; i < list.length; i++) {
         const e = list[i];
         if (!e) continue;
-        const status = e.status || 'Plan to Read';
+        
+        let status = e.status;
+        if (!status) {
+            status = e.type === 'anime' ? 'Plan to Watch' : 'Plan to Read';
+        }
+        
+        // Normalize status names for anime vs manga just in case they were saved weirdly
+        if (e.type === 'anime') {
+            if (status === 'Reading') status = 'Watching';
+            if (status === 'Plan to Read') status = 'Plan to Watch';
+            if (status === 'Re-reading') status = 'Re-watching';
+        } else {
+            if (status === 'Watching') status = 'Reading';
+            if (status === 'Plan to Watch') status = 'Plan to Read';
+            if (status === 'Re-watching') status = 'Re-reading';
+        }
+
         if (statusCounts[status] === undefined) {
             statusCounts[status] = 0;
         }
         statusCounts[status]++;
         
-        if (status === 'Reading') readingCount++;
+        if (status === 'Reading' || status === 'Watching') readingCount++;
         else if (status === 'Completed') completedCount++;
-        else if (status === 'Plan to Read') planCount++;
-        else if (status === 'On Hold') onHoldCount++;
+        else if (status === 'Plan to Read' || status === 'Plan to Watch') planCount++;
+        else if (status === 'On Hold' || status === 'On-Hold') onHoldCount++;
         else if (status === 'Dropped') droppedCount++;
     }
     
-    // 2. Chapters Read
+    // 2. Chapters Read / Episodes Watched
     let totalChapters = 0;
     const mangaReadCounts = [];
     
@@ -365,8 +432,6 @@ const stats = computed(() => {
         const key = historyKeys[j];
         const chapters = hist[key] || [];
         if (Array.isArray(chapters)) {
-            totalChapters += chapters.length;
-            
             // Find corresponding title in library
             let title = key;
             const entry = list.find(e => {
@@ -377,15 +442,22 @@ const stats = computed(() => {
             });
             if (entry) {
                 title = entry.title;
-            } else {
+                totalChapters += chapters.length;
+                mangaReadCounts.push({
+                    title: title,
+                    count: chapters.length
+                });
+            } else if (activeStatsType.value === 'all') {
+                // If it's not in the library at all, it's a historical dangling entry, count it in 'all'
+                totalChapters += chapters.length;
                 if (title.includes(':')) {
                     title = title.substring(title.lastIndexOf(':') + 1);
                 }
+                mangaReadCounts.push({
+                    title: title,
+                    count: chapters.length
+                });
             }
-            mangaReadCounts.push({
-                title: title,
-                count: chapters.length
-            });
         }
     }
     
@@ -401,17 +473,30 @@ const stats = computed(() => {
     const personalKeys = Object.keys(personal);
     for (var k = 0; k < personalKeys.length; k++) {
         const key = personalKeys[k];
-        const pData = personal[key] || {};
-        if (pData.rating && pData.rating > 0) {
-            ratingsSum += pData.rating;
-            ratedMangaCount++;
-            const roundedRating = Math.round(pData.rating);
-            if (ratingDist[roundedRating] !== undefined) {
-                ratingDist[roundedRating]++;
+        // We only want to count ratings/notes for entries in our filtered list
+        const entry = list.find(e => {
+            if (!e) return false;
+            // Get ID or slug matching to match personal keys
+            const keyLower = key.toLowerCase();
+            const eTitleLower = e.title.toLowerCase();
+            const eSlugLower = (e.slug || '').toLowerCase();
+            const eMangaSlugLower = (e.mangaSlug || '').toLowerCase();
+            return keyLower === eTitleLower || keyLower === eSlugLower || keyLower === eMangaSlugLower || (e.anilistData && String(e.anilistData.id) === key);
+        });
+
+        if (entry) {
+            const pData = personal[key] || {};
+            if (pData.rating && pData.rating > 0) {
+                ratingsSum += pData.rating;
+                ratedMangaCount++;
+                const roundedRating = Math.round(pData.rating);
+                if (ratingDist[roundedRating] !== undefined) {
+                    ratingDist[roundedRating]++;
+                }
             }
-        }
-        if (pData.notes && pData.notes.trim() !== '') {
-            totalNotes++;
+            if (pData.notes && pData.notes.trim() !== '') {
+                totalNotes++;
+            }
         }
     }
     
@@ -461,7 +546,7 @@ const stats = computed(() => {
         count: genreCounts[g]
     })).sort((a, b) => b.count - a.count);
     
-    // 6. Recent Reading
+    // 6. Recent Reading / Watching
     const recentReads = [];
     for (var p = 0; p < list.length; p++) {
         const entryObj = list[p];
@@ -1019,6 +1104,43 @@ const sortedStatuses = computed(() => {
         font-size: 14px;
         max-width: 400px;
         line-height: 1.5;
+    }
+}
+
+/* Segmented Toggle Control for Media Type Stats */
+.stats-segmented-control {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+    .control-btn {
+        background: transparent;
+        border: none;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        &:hover {
+            color: var(--text-primary);
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        &.active {
+            color: var(--accent-primary);
+            background: rgba(67, 24, 255, 0.08);
+            box-shadow: inset 0 0 0 1px rgba(67, 24, 255, 0.15);
+        }
     }
 }
 </style>

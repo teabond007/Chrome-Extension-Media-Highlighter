@@ -36,22 +36,35 @@ const props = defineProps({
 
 const emit = defineEmits(['select']);
 
-const defaultStatuses = [
-  { name: 'Reading', color: '#4ade80' },
-  { name: 'Completed', color: '#60a5fa' },
-  { name: 'Plan to Read', color: '#fbbf24' },
-  { name: 'On-Hold', color: '#f97316' },
-  { name: 'Dropped', color: '#ef4444' },
-  { name: 'Re-reading', color: '#a855f7' }
-];
+const defaultStatuses = computed(() => {
+  if (props.entry && props.entry.type === 'anime') {
+    return [
+      { name: 'Watching', color: '#4ade80' },
+      { name: 'Completed', color: '#60a5fa' },
+      { name: 'Plan to Watch', color: '#fbbf24' },
+      { name: 'On-Hold', color: '#f97316' },
+      { name: 'Dropped', color: '#ef4444' },
+      { name: 'Re-watching', color: '#a855f7' }
+    ];
+  }
+  return [
+    { name: 'Reading', color: '#4ade80' },
+    { name: 'Completed', color: '#60a5fa' },
+    { name: 'Plan to Read', color: '#fbbf24' },
+    { name: 'On-Hold', color: '#f97316' },
+    { name: 'Dropped', color: '#ef4444' },
+    { name: 'Re-reading', color: '#a855f7' }
+  ];
+});
 
 const allStatuses = computed(() => {
   console.log("[StatusPicker] computed allStatuses");
   var merged = [];
   
   // Use simple loops to merge arrays
-  for (var i = 0; i < defaultStatuses.length; i++) {
-    merged.push(defaultStatuses[i]);
+  var defaults = defaultStatuses.value;
+  for (var i = 0; i < defaults.length; i++) {
+    merged.push(defaults[i]);
   }
   for (var j = 0; j < props.customStatuses.length; j++) {
     merged.push(props.customStatuses[j]);

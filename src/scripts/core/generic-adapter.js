@@ -27,7 +27,9 @@ export class GenericAdapter {
         /** @type {string} */
         this.name = config.name;
         /** @type {string} */
-        this.unitName = 'chapter';
+        this.type = config.type || 'manga';
+        /** @type {string} */
+        this.unitName = this.type === 'anime' ? 'episode' : 'chapter';
         /** @type {string} */
         this.PREFIX = `custom:${config.hostname}:`;
         /** @type {string} */

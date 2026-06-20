@@ -11,6 +11,9 @@
                     <span class="icon-svg" :class="readerStatus === 'complete' ? 'icon-check' : (readerStatus === 'incomplete' ? 'icon-warning' : 'icon-close')" style="font-size: 10px;"></span>
                     {{ readerStatusText }}
                 </span>
+                <span class="site-type" :class="site.type === 'anime' ? 'anime' : 'manga'">
+                    {{ site.type === 'anime' ? 'Anime' : 'Manga' }}
+                </span>
             </div>
             <span class="site-hostname">{{ site.url || site.hostname }}</span>
         </div>
@@ -235,6 +238,20 @@ const deleteSite = async () => {
                 &.empty {
                     background: rgba(239, 68, 68, 0.15);
                     color: #ef4444;
+                }
+            }
+
+            .site-type {
+                font-size: 11px;
+                padding: 2px 8px;
+                border-radius: 10px;
+                background: rgba(67, 24, 255, 0.1);
+                color: #4318FF;
+                font-weight: 500;
+                
+                &.anime {
+                    background: rgba(168, 85, 247, 0.1);
+                    color: #a855f7;
                 }
             }
         }

@@ -34,14 +34,14 @@
   "content_scripts": [
     {
       "js": [
-        "assets/main.js-loader-a985996b.js"
+        "assets/main.js-loader-6bf35c24.js"
       ],
       "matches": [
         "*://fallback.custom-sites.local/*"
       ],
       "run_at": "document_idle",
       "css": [
-        "assets/main-d8c6b541.css"
+        "assets/main-e684b4de.css"
       ]
     }
   ],
@@ -62,9 +62,9 @@
         "*://fallback.custom-sites.local/*"
       ],
       "resources": [
-        "assets/metadata-service-8116fad9.js",
-        "assets/library-service-b0916bc7.js",
-        "assets/main.js-f997fc88.js"
+        "assets/library-service-3bf5ce80.js",
+        "assets/_plugin-vue_export-helper-5df54e0d.js",
+        "assets/main.js-b9995027.js"
       ],
       "use_dynamic_url": false
     }

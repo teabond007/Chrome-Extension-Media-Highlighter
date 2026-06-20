@@ -28,6 +28,13 @@
                     class="input-field"
                 />
             </div>
+            <div class="form-group">
+                <label for="newSiteType">Website Type</label>
+                <select id="newSiteType" v-model="newSiteType" class="input-field select-field">
+                    <option value="manga">Manga</option>
+                    <option value="anime">Anime</option>
+                </select>
+            </div>
             <button 
                 class="btn btn-primary"
                 @click="startAddSite"
@@ -47,6 +54,7 @@ import { useCustomSitesStore } from '../../../scripts/store/custom-sites.store.j
 const customSitesStore = useCustomSitesStore();
 const newSiteUrl = ref('');
 const newSiteName = ref('');
+const newSiteType = ref('manga');
 
 const isValidUrl = computed(() => {
     try {
@@ -78,6 +86,7 @@ async function startAddSite() {
             hostname: hostname,
             url: newSiteUrl.value,
             name: newSiteName.value || hostname,
+            type: newSiteType.value,
             selectors: [{
                 card: '',
                 title: ''

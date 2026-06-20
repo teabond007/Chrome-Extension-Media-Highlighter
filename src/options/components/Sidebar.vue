@@ -14,7 +14,11 @@
             </a>
             <a href="#" class="nav-item" :class="{ active: activeTab === 'saved-entries' }" @click="setActiveTab('saved-entries')" data-tab="saved-entries">
                 <span class="nav-icon"><span class="icon-svg icon-library" style="width: 20px; height: 20px;"></span></span>
-                <span class="nav-text">Saved Entries</span>
+                <span class="nav-text">Manga Library</span>
+            </a>
+            <a href="#" class="nav-item" :class="{ active: activeTab === 'saved-anime' }" @click="setActiveTab('saved-anime')" data-tab="saved-anime">
+                <span class="nav-icon"><span class="icon-svg icon-video" style="width: 20px; height: 20px;"></span></span>
+                <span class="nav-text">Anime Library</span>
             </a>
             <a href="#" class="nav-item" :class="{ active: activeTab === 'stats' }" @click="setActiveTab('stats')" data-tab="stats">
                 <span class="nav-icon"><span class="icon-svg icon-target" style="width: 20px; height: 20px;"></span></span>

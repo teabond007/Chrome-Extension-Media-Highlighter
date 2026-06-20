@@ -25,9 +25,11 @@ export const useLibraryStore = defineStore('library', {
 
     getters: {
         totalEntries: (state) => state.entries.length,
-        readingEntries: (state) => state.entries.filter(e => e.status === 'Reading'),
+        readingEntries: (state) => state.entries.filter(e => e.status === 'Reading' || e.status === 'Watching'),
         completedEntries: (state) => state.entries.filter(e => e.status === 'Completed'),
-        planToReadEntries: (state) => state.entries.filter(e => e.status === 'Plan to Read')
+        planToReadEntries: (state) => state.entries.filter(e => e.status === 'Plan to Read' || e.status === 'Plan to Watch'),
+        mangaEntries: (state) => state.entries.filter(e => e.type !== 'anime'),
+        animeEntries: (state) => state.entries.filter(e => e.type === 'anime')
     },
 
     actions: {
@@ -312,7 +314,7 @@ export const useLibraryStore = defineStore('library', {
 
                 try {
                     // Use centralized metadata service
-                    const data = await getMergedMetadata(liveEntry.title);
+                    const data = await getMergedMetadata(liveEntry.title, liveEntry.type);
 
                     if (data != null) {
                         liveEntry.anilistData = data;

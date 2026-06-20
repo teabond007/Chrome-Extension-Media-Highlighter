@@ -101,6 +101,12 @@
         -webkit-mask-image: url('../../images/library.svg');
     }
 
+    &-video {
+        mask-image: url('../../images/video.svg');
+        -webkit-mask-image: url('../../images/video.svg');
+    }
+
+
     &-target {
         mask-image: url('../../images/target.svg');
         -webkit-mask-image: url('../../images/target.svg');

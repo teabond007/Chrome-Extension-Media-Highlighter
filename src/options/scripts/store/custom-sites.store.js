@@ -106,6 +106,7 @@ export const useCustomSitesStore = defineStore('customSites', {
                     hostname: siteData.hostname || '',
                     url: siteData.url || ('https://' + (siteData.hostname || '')),
                     name: siteData.name || 'Untitled Site',
+                    type: siteData.type || 'manga',
                     selectors: {
                         card: (siteData.selectors ? siteData.selectors.card : '') || '',
                         title: (siteData.selectors ? siteData.selectors.title : '') || ''

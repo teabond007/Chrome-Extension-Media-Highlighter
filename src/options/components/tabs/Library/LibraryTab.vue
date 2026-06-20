@@ -1,13 +1,13 @@
 <template>
-    <div id="tab-saved-entries" class="tab-pane fade-in" :class="{ active: settingsStore.activeTab === 'saved-entries' }">
+    <div :id="mediaType === 'anime' ? 'tab-saved-anime' : 'tab-saved-entries'" class="tab-pane fade-in" :class="{ active: settingsStore.activeTab === (mediaType === 'anime' ? 'saved-anime' : 'saved-entries') }">
         <header class="header">
             <div class="header-text">
-                <h1>Library</h1>
-                <p class="subtitle">Browse and manage your manga library</p>
+                <h1>{{ mediaType === 'anime' ? 'Anime Library' : 'Library' }}</h1>
+                <p class="subtitle">Browse and manage your {{ mediaType === 'anime' ? 'anime' : 'manga' }} library</p>
             </div>
             <div class="header-actions" style="display: flex; gap: 10px; align-items: center;">
-                <button @click="addNewManga" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px;">
-                    <span class="icon-svg icon-plus"></span> Add Manga
+                <button @click="addNewEntry" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <span class="icon-svg icon-plus"></span> Add {{ mediaType === 'anime' ? 'Anime' : 'Manga' }}
                 </button>
                 <button @click="syncMissing" class="btn btn-warning-large" style="display: inline-flex; align-items: center; gap: 6px;" title="Fetch info for entries stuck on 'Loading info...'">
                     <span class="icon-svg icon-zap"></span> Sync Missing Info
@@ -31,6 +31,7 @@
                 :show-stats="showStats"
                 :card-view-size="cardViewSize"
                 :sorted-entries-count="sortedEntries.length"
+                :media-type="mediaType"
                 @toggle-stats="toggleStats"
                 @set-view-size="setViewSize"
                 @clear-filters="clearFilters"
@@ -76,18 +77,28 @@ import {
 } from '../../../../config.js';
 import { useSettingsStore } from '../../../scripts/store/settings.store.js';
 
-// Access Pinia Stores
+const props = defineProps({
+    mediaType: {
+        type: String,
+        default: 'manga'
+    }
+});
+
 // Access Pinia Stores
 const libraryStore = useLibraryStore();
 const settingsStore = useSettingsStore();
 
 // Destructure reactive state from stores
 const { 
-    entries: savedEntries, 
     personalData, 
     isSyncing, 
     syncProgress 
 } = storeToRefs(libraryStore);
+
+// Compute savedEntries from partitioned store lists
+const savedEntries = computed(() => {
+    return props.mediaType === 'anime' ? libraryStore.animeEntries : libraryStore.mangaEntries;
+});
 
 const { 
     libraryBordersEnabled, 
@@ -352,27 +363,29 @@ const showStatusPicker = (entry) => {
     if (window.showStatusPicker) window.showStatusPicker(entry);
 };
 
-const addNewManga = async () => {
-    const title = prompt("Enter the exact manga title to add:");
+const addNewEntry = async () => {
+    const isAnime = props.mediaType === 'anime';
+    const title = prompt(isAnime ? "Enter the exact anime title to add:" : "Enter the exact manga title to add:");
     if (!title?.trim()) return;
 
     try {
-        const metadata = await getMergedMetadata(title.trim());
+        const metadata = await getMergedMetadata(title.trim(), props.mediaType);
         const displayTitle = metadata?.title?.english || metadata?.title?.romaji || title.trim();
         
         const newEntry = {
             title: displayTitle,
-            status: 'Plan to Read',
+            status: props.mediaType === 'anime' ? 'Plan to Watch' : 'Plan to Read',
             lastUpdated: Date.now(),
             anilistData: metadata || undefined,
+            type: props.mediaType
         };
         
-        const exists = savedEntries.value.some(e => 
+        const exists = libraryStore.entries.some(e => 
             e.title.toLowerCase() === newEntry.title.toLowerCase()
         );
         
         if (exists) {
-            alert("Manga is already in your library!");
+            alert(`${isAnime ? 'Anime' : 'Manga'} is already in your library!`);
             return;
         }
 
@@ -380,7 +393,7 @@ const addNewManga = async () => {
         alert(`Successfully added "${displayTitle}" to your library.`);
     } catch(e) {
         console.error(e);
-        alert("Error adding manga.");
+        alert(`Error adding ${isAnime ? 'anime' : 'manga'}.`);
     }
 };
 

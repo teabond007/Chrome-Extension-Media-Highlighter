@@ -113,7 +113,8 @@ export class CardEnhancer {
                             status: 'Add to Library',
                             source: this.adapter.id,
                             sourceId: card.data.id,
-                            sourceUrl: card.data.url
+                            sourceUrl: card.data.url,
+                            type: this.adapter.type || 'manga'
                         };
                         this.applyQuickActions(card, skeletonEntry);
                     }
@@ -495,6 +496,9 @@ export class CardEnhancer {
                 // Entry already exists — just update its status in place
                 entries[foundIdx].status = newStatus;
                 entries[foundIdx].lastUpdated = Date.now();
+                if (this.adapter.type) {
+                    entries[foundIdx].type = this.adapter.type;
+                }
              
             } else {
                 // Entry is new — build it and try to fetch metadata before saving
@@ -505,11 +509,12 @@ export class CardEnhancer {
                     source: entry.source,
                     sourceId: entry.sourceId,
                     sourceUrl: entry.sourceUrl,
+                    type: entry.type || this.adapter.type || 'manga',
                     lastUpdated: Date.now()
                 };
 
                 try {
-                    var metadata = await getMergedMetadata(entry.title);
+                    var metadata = await getMergedMetadata(entry.title, newEntry.type);
                     if (metadata) {
                         newEntry.anilistData = metadata;
                     }

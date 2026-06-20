@@ -2,12 +2,12 @@
     <div class="library-header">
         <div class="library-title-section">
             <div class="library-icon">
-                <span class="icon-svg icon-library" style="font-size: 24px;"></span>
+                <span class="icon-svg" :class="mediaType === 'anime' ? 'icon-video' : 'icon-library'" style="font-size: 24px;"></span>
             </div>
             <div class="library-title-text">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <h2>Your Library</h2>
-                  
+                    <h2>{{ mediaType === 'anime' ? 'Anime Library' : 'Your Library' }}</h2>
+                    
                     
                     <button 
                         class="info-redirect-btn" 
@@ -55,10 +55,10 @@
 
             <select v-model="filters.status" class="select-field">
                 <option value="All">All Statuses</option>
-                <option value="Reading">Reading</option>
+                <option :value="mediaType === 'anime' ? 'Watching' : 'Reading'">{{ mediaType === 'anime' ? 'Watching' : 'Reading' }}</option>
                 <option value="Completed">Completed</option>
                 <option value="On Hold">On Hold</option>
-                <option value="Plan to Read">Plan to Read</option>
+                <option :value="mediaType === 'anime' ? 'Plan to Watch' : 'Plan to Read'">{{ mediaType === 'anime' ? 'Plan to Watch' : 'Plan to Read' }}</option>
                 <option value="Dropped">Dropped</option>
                 <option value="HasHistory">Has History</option>
                 <template v-if="customStatuses && customStatuses.length > 0">
@@ -76,11 +76,20 @@
 
             <select v-model="filters.format" class="select-field">
                 <option value="All">All Formats</option>
-                <option value="Manga">Manga</option>
-                <option value="Manhwa">Manhwa</option>
-                <option value="Manhua">Manhua</option>
-                <option value="One Shot">One Shot</option>
-                <option value="Light Novel">Light Novel</option>
+                <template v-if="mediaType === 'anime'">
+                    <option value="TV">TV Show</option>
+                    <option value="Movie">Movie</option>
+                    <option value="OVA">OVA</option>
+                    <option value="ONA">ONA</option>
+                    <option value="Special">Special</option>
+                </template>
+                <template v-else>
+                    <option value="Manga">Manga</option>
+                    <option value="Manhwa">Manhwa</option>
+                    <option value="Manhua">Manhua</option>
+                    <option value="One Shot">One Shot</option>
+                    <option value="Light Novel">Light Novel</option>
+                </template>
             </select>
 
             <div class="search-wrapper">
@@ -136,7 +145,11 @@ defineProps({
     availableGenres: Array,
     showStats: Boolean,
     sortedEntriesCount: Number,
-    cardViewSize: String
+    cardViewSize: String,
+    mediaType: {
+        type: String,
+        default: 'manga'
+    }
 });
 
 defineEmits(['toggle-stats', 'set-view-size', 'clear-filters']);

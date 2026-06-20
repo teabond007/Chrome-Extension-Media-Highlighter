@@ -7,7 +7,8 @@
         <main class="main-content">
             <GeneralTab v-show="settingsStore.activeTab === 'settings'" />
             <AppearanceTab v-show="settingsStore.activeTab === 'appearance'" />
-            <LibraryTab v-show="settingsStore.activeTab === 'saved-entries'" />
+            <LibraryTab v-show="settingsStore.activeTab === 'saved-entries'" mediaType="manga" />
+            <LibraryTab v-show="settingsStore.activeTab === 'saved-anime'" mediaType="anime" />
             <StatsTab v-show="settingsStore.activeTab === 'stats'" />
             <AboutTab v-show="settingsStore.activeTab === 'about'" />
             <CustomSitesTab v-show="settingsStore.activeTab === 'custom-sites'" />
@@ -114,7 +115,9 @@ const handleUrlParams = () => {
     const hash = window.location.hash;
     if (!hash) return;
 
-    if (hash.includes('library') || hash.includes('saved-entries')) {
+    if (hash.includes('saved-anime')) {
+        settingsStore.activeTab = 'saved-anime';
+    } else if (hash.includes('library') || hash.includes('saved-entries')) {
         settingsStore.activeTab = 'saved-entries';
     }
 
@@ -123,6 +126,15 @@ const handleUrlParams = () => {
             const parts = hash.split('showDetails=');
             if (parts.length > 1) {
                 const title = decodeURIComponent(parts[1].split('&')[0]);
+                
+                // Set the correct active tab based on the entry type if it exists
+                const entry = libraryStore.entries.find(e => e.title.toLowerCase() === title.toLowerCase());
+                if (entry && entry.type === 'anime') {
+                    settingsStore.activeTab = 'saved-anime';
+                } else if (entry) {
+                    settingsStore.activeTab = 'saved-entries';
+                }
+
                 libraryStore.showEntryDetails(title);
             }
         } catch (e) {
@@ -137,7 +149,12 @@ const handleUrlParams = () => {
 const setupMessageListeners = () => {
     chrome.runtime.onMessage.addListener((msg) => {
         if (msg.type === "showMangaDetails") {
-            settingsStore.activeTab = 'saved-entries';
+            const entry = libraryStore.entries.find(e => e.title.toLowerCase() === msg.title.toLowerCase());
+            if (entry && entry.type === 'anime') {
+                settingsStore.activeTab = 'saved-anime';
+            } else {
+                settingsStore.activeTab = 'saved-entries';
+            }
             libraryStore.showEntryDetails(msg.title);
         } else if (msg.type === "log") {
             console.log("[Background LOG]", msg.text);

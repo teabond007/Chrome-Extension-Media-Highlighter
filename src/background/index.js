@@ -5,6 +5,7 @@
 
 import { getMergedMetadata } from '../scripts/core/api/metadata-service';
 import { DATA } from '../config.js';
+import { getMangaId } from '../scripts/core/library-service.js';
 
 // Open options page when extension icon clicked
 chrome.action.onClicked.addListener(() => {
@@ -35,7 +36,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   } else if (msg.type === "fetchMetadata") {
     // Fetch AniList/MangaDex metadata from background (avoids CORS on custom sites)
-    handleFetchMetadata(msg.title, msg.storageKey, sendResponse);
+    handleFetchMetadata(msg.title, msg.storageKey, msg.entryType, sendResponse);
     return true;
   } else if (msg.type === "inject-selector-tool") {
     // Manually inject the content script and CSS into a tab (used by options page to start selector tool immediately)
@@ -168,14 +169,14 @@ async function handleCustomSitesUpdate(sendResponse) {
  * Fetches AniList/MangaDex metadata for a library entry and updates storage.
  * Runs in the background to avoid CORS issues on custom site content scripts.
  * @param {string} title - Manga title to search for
- * @param {string} storageKey - Storage key to find the entry
+ * @param {string} entryType - Media type (manga or anime)
  * @param {Function} sendResponse - Response callback
  */
-async function handleFetchMetadata(title, storageKey, sendResponse) {
+async function handleFetchMetadata(title, storageKey, entryType, sendResponse) {
   try {
-    Log(`Fetching metadata for: ${title}`);
+    Log(`Fetching metadata for: ${title} (${entryType})`);
 
-    const data = await getMergedMetadata(title);
+    const data = await getMergedMetadata(title, entryType || 'manga');
 
     if (!data) {
       Log(`No metadata found for: ${title}`);
@@ -186,7 +187,7 @@ async function handleFetchMetadata(title, storageKey, sendResponse) {
     // Update the entry in storage
     const stored = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES]);
     const library = stored[DATA.LIBRARY_ENTRIES] || [];
-    const entry = library.find(e => e.slug === storageKey || e.title === title);
+    const entry = library.find(e => getMangaId(e) === storageKey || e.title.toLowerCase() === title.toLowerCase());
 
     if (entry) {
       entry.anilistData = data;

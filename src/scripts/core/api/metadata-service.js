@@ -12,20 +12,21 @@ import { fetchMangaFromMangadex } from './mangadex-api.js';
  * @param {string} title 
  * @returns {Object|null} Manga data object or null if error
  */
-export async function getMergedMetadata(title) {
+export async function getMergedMetadata(title, mediaType) {
     // We check if the title is actually there
     if (title == "" || title == null || title == undefined) {
         return null;
     }
 
-    console.log("Starting to look for metadata for: " + title);
+    var type = mediaType || 'manga';
+    console.log("Starting to look for metadata for: " + title + " (type: " + type + ")");
 
     try {
 
-        var data = await fetchMangaFromAnilist(title);
+        var data = await fetchMangaFromAnilist(title, 0, type);
         
         if (data != null) {
-            console.log("We found the manga on Anilist! ID is " + data.id);
+            console.log("We found the entry on Anilist! ID is " + data.id);
         } else {
             console.log("We could not find anything on Anilist for " + title);
         }
@@ -64,8 +65,8 @@ export async function getMergedMetadata(title) {
             
         }
 
-        // This calls other API
-        if (isMissingStuff == true) {
+        // This calls other API only for manga entries
+        if (isMissingStuff == true && type === 'manga') {
 
             
             var mdData = await fetchMangaFromMangadex(title);

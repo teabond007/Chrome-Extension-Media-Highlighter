@@ -12,21 +12,27 @@
 export const STATUS_COLORS = {
     // Display names (used by StatusPicker, overlay tooltips)
     'Reading': '#4ade80',
+    'Watching': '#4ade80',
     'Completed': '#60a5fa',
     'Plan to Read': '#fbbf24',
+    'Plan to Watch': '#fbbf24',
     'On-Hold': '#f97316',
     'On Hold': '#f97316',
     'Dropped': '#ef4444',
     'Re-reading': '#a855f7',
+    'Re-watching': '#a855f7',
     'HasHistory': '#9ca3af',
 
     // Internal lowercase keys (used by library card factory, SCSS-driven status classes)
     'reading': '#4ade80',
+    'watching': '#4ade80',
     'read': '#9f9f9f',
     'completed': '#60a5fa',
     'dropped': '#ef4444',
     'onhold': '#f97316',
     'planning': '#fbbf24',
+    'plan to watch': '#fbbf24',
+    're-watching': '#a855f7',
     'default': '#8B95A5'
 };
 

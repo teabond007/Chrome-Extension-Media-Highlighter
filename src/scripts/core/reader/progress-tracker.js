@@ -54,6 +54,7 @@ class ProgressTracker {
             this.currentQuery.title = urlData.title || '';
             this.currentQuery.sourceId = urlData.id;
             this.currentQuery.mangaSlug = urlData.slug;
+            this.currentQuery.type = this.adapter.type || 'manga';
 
             this.currentProgress = {
                 chapter: String(urlData.chapterNo),
@@ -139,12 +140,12 @@ class ProgressTracker {
 
             // Display a floating notification on the reader page only when a new entry is added
             if (isNewEntry && entry) {
-                this.showFloatingNotification(entry.title);
+                this.showFloatingNotification(entry.title, entry.type);
             }
 
             if (entry && !entry.anilistData) {
                 console.log("[ProgressTracker] Metadata is missing, asking background script to fetch it!");
-                this.fetchMetadataForEntry(entry.title, LibraryService.getMangaId(entry));
+                this.fetchMetadataForEntry(entry.title, LibraryService.getMangaId(entry), entry.type || 'manga');
             }
 
         } catch (error) {
@@ -177,12 +178,13 @@ class ProgressTracker {
     /**
      * Requests metadata fetch from the background script.
      */
-    async fetchMetadataForEntry(title, mangaId) {
+    async fetchMetadataForEntry(title, mangaId, entryType) {
         try {
             chrome.runtime.sendMessage({
                 type: 'fetchMetadata',
                 title: title,
-                storageKey: mangaId 
+                storageKey: mangaId,
+                entryType: entryType || 'manga' 
             });
         } catch (e) {
              console.warn('[ProgressTracker] Metadata request failed:', e);
@@ -255,7 +257,7 @@ class ProgressTracker {
      * Shows a premium floating notification on the reader page.
      * @param {string} mangaTitle - Title of the added manga
      */
-    showFloatingNotification(mangaTitle) {
+    showFloatingNotification(mangaTitle, type) {
         try {
             this.injectNotificationStyles();
 
@@ -271,7 +273,7 @@ class ProgressTracker {
 
             var titleEl = document.createElement('div');
             titleEl.className = 'bmh-notification-title';
-            titleEl.textContent = 'Manga Added';
+            titleEl.textContent = (type === 'anime' ? 'Anime' : 'Manga') + ' Added';
 
             var messageEl = document.createElement('div');
             messageEl.className = 'bmh-notification-message';

@@ -36,7 +36,7 @@ function slugify(title) {
  * @returns {Object|undefined}
  */
 export function findEntry(library, query) {
-    console.log("[LibraryService] Starting findEntry to find matching saved manga!");
+    console.log("[LibraryService] Starting findEntry to find matching saved " + (query.type || 'manga') + "!");
     try {
         var title = query.title;
         console.log("[LibraryService] Title we are looking for is: " + title);
@@ -162,7 +162,7 @@ export async function upsertEntry(entryData) {
 
         if (existingIdx !== -1) {
             // Update the existing entry
-            console.log("[LibraryService] Updating existing manga entry in library: " + entryData.title);
+            console.log("[LibraryService] Updating existing " + (entryData.type || 'manga') + " entry in library: " + entryData.title);
             var entry = library[existingIdx];
             
             // Copy the data manually
@@ -170,14 +170,33 @@ export async function upsertEntry(entryData) {
                 entry[key] = entryData[key];
             }
             
+            // Align status depending on the type
+            if (entry.type === 'anime') {
+                if (entry.status === 'Reading' || !entry.status || entry.status === 'Add to Library') {
+                    entry.status = 'Watching';
+                } else if (entry.status === 'Plan to Read') {
+                    entry.status = 'Plan to Watch';
+                } else if (entry.status === 'Re-reading') {
+                    entry.status = 'Re-watching';
+                }
+            } else {
+                if (entry.status === 'Watching' || !entry.status || entry.status === 'Add to Library') {
+                    entry.status = 'Reading';
+                } else if (entry.status === 'Plan to Watch') {
+                    entry.status = 'Plan to Read';
+                } else if (entry.status === 'Re-watching') {
+                    entry.status = 'Re-reading';
+                }
+            }
+            
             entry.lastUpdated = now;
             library[existingIdx] = entry;
             updatedEntry = entry;
         } else {
             // Create a new entry
-            console.log("[LibraryService] Creating a brand new manga entry in library: " + entryData.title);
+            console.log("[LibraryService] Creating a brand new " + (entryData.type || 'manga') + " entry in library: " + entryData.title);
             var newEntry = {};
-            newEntry.status = DEFAULT_STATUS;
+            newEntry.status = entryData.type === 'anime' ? 'Watching' : DEFAULT_STATUS;
             
             for (var key in entryData) {
                 newEntry[key] = entryData[key];
@@ -229,10 +248,32 @@ export async function updateProgress(query, progress) {
         entry[LIBRARY_ENTRY_KEYS.LAST_READER_URL] = progress.url;
         entry[LIBRARY_ENTRY_KEYS.LAST_READ] = Date.now();
         entry[LIBRARY_ENTRY_KEYS.LAST_UPDATED] = Date.now();
-
-        const finalLibrary = Array.isArray(library) ? library : [];
-        await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(finalLibrary)) });
     }
+
+    // Ensure type and status are synchronized
+    if (query.type) {
+        entry.type = query.type;
+        if (entry.type === 'anime') {
+            if (entry.status === 'Reading' || !entry.status || entry.status === 'Add to Library') {
+                entry.status = 'Watching';
+            } else if (entry.status === 'Plan to Read') {
+                entry.status = 'Plan to Watch';
+            } else if (entry.status === 'Re-reading') {
+                entry.status = 'Re-watching';
+            }
+        } else {
+            if (entry.status === 'Watching' || !entry.status || entry.status === 'Add to Library') {
+                entry.status = 'Reading';
+            } else if (entry.status === 'Plan to Watch') {
+                entry.status = 'Plan to Read';
+            } else if (entry.status === 'Re-watching') {
+                entry.status = 'Re-reading';
+            }
+        }
+    }
+
+    const finalLibrary = Array.isArray(library) ? library : [];
+    await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(finalLibrary)) });
 
     return entry;
 }

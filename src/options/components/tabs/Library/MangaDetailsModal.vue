@@ -40,20 +40,20 @@
                         </div>
                         <!-- Separate History Section -->
                         <div class="modal-sidebar-info modal-sidebar-history" id="modalHistoryRow">
-                            <span class="modal-meta-label">Reading History</span>
+                            <span class="modal-meta-label">{{ currentEntry.type === 'anime' ? 'Watching History' : 'Reading History' }}</span>
                             <div class="modal-history-actions">
                                 <button class="btn btn-ghost btn-sm" @click="toggleChaptersList"
                                     style="padding: 2px 8px; font-size: 11px;">
-                                    {{ showChapters ? 'Hide Chapters' : 'Show Chapters' }}
+                                    {{ showChapters ? (currentEntry.type === 'anime' ? 'Hide Episodes' : 'Hide Chapters') : (currentEntry.type === 'anime' ? 'Show Episodes' : 'Show Chapters') }}
                                 </button>
                                 <button class="btn btn-primary btn-sm" @click="handleMarkAllRead"
                                     style="padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"
-                                    title="Mark all chapters as read up to total">
-                                    <span class="icon-svg icon-check"></span> Mark All Read
+                                    :title="currentEntry.type === 'anime' ? 'Mark all episodes as watched up to total' : 'Mark all chapters as read up to total'">
+                                    <span class="icon-svg icon-check"></span> {{ currentEntry.type === 'anime' ? 'Mark All Watched' : 'Mark All Read' }}
                                 </button>
                             </div>
                             <div v-if="showChapters" id="modalReadChaptersList" class="modal-chapters-list">
-                                <span v-for="ch in sortedChapters" :key="ch" class="chapter-pill">{{ ch }}</span>
+                                <span v-for="ch in sortedChapters" :key="ch" class="chapter-pill">{{ currentEntry.type === 'anime' ? 'Ep. ' : 'Ch. ' }}{{ ch }}</span>
                                 <span v-if="sortedChapters.length === 0" style="color: var(--text-secondary); font-style: italic;">
                                     No history found
                                 </span>
@@ -61,7 +61,7 @@
                         </div>
                         <!-- Remove Manga -->
                         <button class="btn btn-danger btn-sm btn-remove-manga" @click="handleRemoveManga" style="display: inline-flex; align-items: center; gap: 6px; justify-content: center;">
-                            <span class="icon-svg icon-trash"></span> Remove Manga
+                            <span class="icon-svg icon-trash"></span> Remove {{ currentEntry.type === 'anime' ? 'Anime' : 'Manga' }}
                         </button>
                     </div>
                     <div class="modal-main">
@@ -172,7 +172,7 @@ watch(() => libraryStore.selectedEntry, (newEntry) => {
  * Normalizes format name
  */
 const formatName = computed(() => {
-    if (!ani.value) return 'Manga';
+    if (!ani.value) return currentEntry.value?.type === 'anime' ? 'Anime' : 'Manga';
     return getFormatName(ani.value.format, ani.value.countryOfOrigin);
 });
  
@@ -384,13 +384,14 @@ const loadHistoryChapters = () => {
 };
  
 const handleMarkAllRead = async () => {
-    const totalChapters = ani.value?.chapters;
+    const isAnime = currentEntry.value?.type === 'anime';
+    const totalChapters = isAnime ? ani.value?.episodes : ani.value?.chapters;
     if (!totalChapters || totalChapters <= 0) {
-        alert('Unable to mark all as read: Total chapter count is unknown.');
+        alert(`Unable to mark all as read: Total ${isAnime ? 'episode' : 'chapter'} count is unknown.`);
         return;
     }
  
-    if (!confirm(`Mark all ${totalChapters} chapters as read?`)) return;
+    if (!confirm(`Mark all ${totalChapters} ${isAnime ? 'episodes as watched' : 'chapters as read'}?`)) return;
  
     const allChapters = Array.from({ length: totalChapters }, (_, i) => String(i + 1));
     const slugify = (str) => str.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');

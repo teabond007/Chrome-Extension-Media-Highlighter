@@ -431,7 +431,14 @@ export class OverlayFactory {
 
         const safeCustomStatuses = Array.isArray(customStatuses) ? customStatuses : [];
 
-        const defaultStatuses = [
+        const defaultStatuses = entry.type === 'anime' ? [
+            { name: 'Watching', color: '#4ade80' },
+            { name: 'Completed', color: '#60a5fa' },
+            { name: 'Plan to Watch', color: '#fbbf24' },
+            { name: 'On-Hold', color: '#f97316' },
+            { name: 'Dropped', color: '#ef4444' },
+            { name: 'Re-watching', color: '#a855f7' }
+        ] : [
             { name: 'Reading', color: '#4ade80' },
             { name: 'Completed', color: '#60a5fa' },
             { name: 'Plan to Read', color: '#fbbf24' },
