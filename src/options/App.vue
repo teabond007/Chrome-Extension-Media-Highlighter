@@ -8,6 +8,7 @@
             <GeneralTab v-show="settingsStore.activeTab === 'settings'" />
             <AppearanceTab v-show="settingsStore.activeTab === 'appearance'" />
             <LibraryTab v-show="settingsStore.activeTab === 'saved-entries'" />
+            <StatsTab v-show="settingsStore.activeTab === 'stats'" />
             <AboutTab v-show="settingsStore.activeTab === 'about'" />
             <CustomSitesTab v-show="settingsStore.activeTab === 'custom-sites'" />
             <BackupTab v-show="settingsStore.activeTab === 'backup'" />
@@ -36,6 +37,7 @@ import Sidebar from './components/Sidebar.vue';
 import GeneralTab from './components/tabs/General/GeneralTab.vue';
 import AppearanceTab from './components/tabs/Appearance/AppearanceTab.vue';
 import LibraryTab from './components/tabs/Library/LibraryTab.vue';
+import StatsTab from './components/tabs/Stats/StatsTab.vue';
 import AboutTab from './components/tabs/About/AboutTab.vue';
 import CustomSitesTab from './components/tabs/CustomSites/CustomSitesTab.vue';
 import BackupTab from './components/tabs/Backup/BackupTab.vue';

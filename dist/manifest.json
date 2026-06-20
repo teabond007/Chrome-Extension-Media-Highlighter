@@ -34,7 +34,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/main.js-loader-72e9366f.js"
+        "assets/main.js-loader-a985996b.js"
       ],
       "matches": [
         "*://fallback.custom-sites.local/*"
@@ -63,8 +63,8 @@
       ],
       "resources": [
         "assets/metadata-service-8116fad9.js",
-        "assets/library-service-3941a8b6.js",
-        "assets/main.js-1ad955fb.js"
+        "assets/library-service-b0916bc7.js",
+        "assets/main.js-f997fc88.js"
       ],
       "use_dynamic_url": false
     }

@@ -16,6 +16,10 @@
                 <span class="nav-icon"><span class="icon-svg icon-library" style="width: 20px; height: 20px;"></span></span>
                 <span class="nav-text">Saved Entries</span>
             </a>
+            <a href="#" class="nav-item" :class="{ active: activeTab === 'stats' }" @click="setActiveTab('stats')" data-tab="stats">
+                <span class="nav-icon"><span class="icon-svg icon-target" style="width: 20px; height: 20px;"></span></span>
+                <span class="nav-text">Statistics</span>
+            </a>
             <a href="#" class="nav-item" :class="{ active: activeTab === 'appearance' }" @click="setActiveTab('appearance')" data-tab="appearance">
                 <span class="nav-icon"><span class="icon-svg icon-palette" style="width: 20px; height: 20px;"></span></span>
                 <span class="nav-text">Appearance</span>
