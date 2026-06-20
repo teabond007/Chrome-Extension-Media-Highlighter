@@ -60,18 +60,68 @@ function bootstrap() {
             console.log('[BMH] Matched custom config:', customConfig);
             var adapter = new GenericAdapter(customConfig);
 
-            // Check if this is a reader page first
-            var isReader = adapter.isReaderPage();
+            var currentMode = null; 
+            var activeTracker = null;
+            var activeObserver = null;
+            var lastUrl = '';
 
-            if (isReader) {
-                console.log('[BMH] Reader page detected, initializing progress tracking');
-                var tracker = new ProgressTracker(adapter);
-                tracker.init();
-            } else {
-                // Listing/Gallery page: Always enhance cards
-                console.log('[BMH] Gallery/Listing page detected, initializing card enhancements');
-                initCustomSite(customConfig, settings);
-            }
+            /**
+             * Checks the current page type and initializes/switches modules if needed.
+             * Runs periodically to support SPA navigation and dynamic element rendering.
+             */
+            var checkPageMode = function() {
+                // Stop checking if the extension context was invalidated
+                if (!chrome.runtime || !chrome.runtime.id) {
+                    clearInterval(modeInterval);
+                    return;
+                }
+
+                var currentUrl = window.location.href;
+                var urlChanged = currentUrl !== lastUrl;
+                
+                var isReader = adapter.isReaderPage();
+                var targetMode = isReader ? 'reader' : 'gallery';
+
+                if (urlChanged || targetMode !== currentMode) {
+                    console.log('[BMH] Page update detected. Mode: ' + targetMode + ', URL: ' + currentUrl);
+                    lastUrl = currentUrl;
+
+                    // Clean up resources from the previous mode
+                    if (activeTracker) {
+                        console.log('[BMH] Destroying previous progress tracker');
+                        activeTracker.destroy();
+                        activeTracker = null;
+                    }
+                    if (activeObserver) {
+                        console.log('[BMH] Disconnecting previous card enhancer observer');
+                        activeObserver.disconnect();
+                        activeObserver = null;
+                    }
+
+                    currentMode = targetMode;
+
+                    if (currentMode === 'reader') {
+                        console.log('[BMH] Reader page active. Initializing progress tracker...');
+                        activeTracker = new ProgressTracker(adapter);
+                        activeTracker.init();
+                    } else {
+                        console.log('[BMH] Gallery page active. Initializing card enhancer...');
+                        initCustomSite(customConfig, settings).then(function(observer) {
+                            if (currentMode !== 'gallery' && observer) {
+                                observer.disconnect();
+                            } else {
+                                activeObserver = observer;
+                            }
+                        });
+                    }
+                }
+            };
+
+            // Run initial mode check immediately
+            checkPageMode();
+
+            // Set up a recurring interval to check for SPA transitions or dynamically loaded reader elements
+            var modeInterval = setInterval(checkPageMode, 1000);
         } else {
             console.warn("[BMH] No adapter found for host: " + currentHost);
         }

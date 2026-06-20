@@ -94,7 +94,7 @@ class ProgressTracker {
     setupScrollTracking() {
         let scrollSaved = false;
         
-        const checkScroll = () => {
+        this.scrollListener = () => {
             if (scrollSaved || this.isSaved) return;
             
             const scrollPercent = window.scrollY / (document.body.scrollHeight - window.innerHeight);
@@ -105,7 +105,7 @@ class ProgressTracker {
             }
         };
 
-        window.addEventListener('scroll', checkScroll, { passive: true });
+        window.addEventListener('scroll', this.scrollListener, { passive: true });
     }
 
     /**
@@ -191,6 +191,10 @@ class ProgressTracker {
         if (this.saveTimeout) {
             clearTimeout(this.saveTimeout);
             this.saveTimeout = null;
+        }
+        if (this.scrollListener) {
+            window.removeEventListener('scroll', this.scrollListener);
+            this.scrollListener = null;
         }
     }
 }

@@ -338,7 +338,7 @@ export async function initCustomSite(config, settings) {
 
     if (!hasCard) {
         console.warn('[BMH-Custom] No card selector configured, skipping enhancement');
-        return;
+        return null;
     }
 
     // Inject overlay styles
@@ -358,12 +358,24 @@ export async function initCustomSite(config, settings) {
     const count = await enhancer.enhanceAll();
     console.log(`[BMH-Custom] Enhanced ${count} cards.`);
 
-    // Use a simple interval to check for new cards every 2 seconds
-    setInterval(function() {
-        if (chrome.runtime && chrome.runtime.id) {
-            enhancer.enhanceAll();
+    // Use MutationObserver instead of setInterval to watch for dynamic DOM updates (e.g. infinite scroll)
+    var debounceTimeout = null;
+    var observer = new MutationObserver(function(mutations) {
+        if (debounceTimeout) {
+            clearTimeout(debounceTimeout);
         }
-    }, 2000);
+        debounceTimeout = setTimeout(function() {
+            if (chrome.runtime && chrome.runtime.id) {
+                enhancer.enhanceAll();
+            }
+        }, 300);
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
 
     console.log(`[BMH-Custom] Enhancement complete for ${config.hostname}`);
+    return observer;
 }
