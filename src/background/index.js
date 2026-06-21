@@ -195,7 +195,7 @@ async function handleFetchMetadata(title, storageKey, entryType, sendResponse) {
       
       // Ensure array integrity and plain object serialization
       const finalLibrary = Array.isArray(library) ? library : [];
-      await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(finalLibrary)) });
+      await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: finalLibrary });
       Log(`Metadata saved for: ${title}`);
     }
 

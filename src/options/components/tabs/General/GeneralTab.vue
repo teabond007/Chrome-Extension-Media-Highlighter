@@ -45,6 +45,13 @@
                             v-model="progressTracking"
                             margin-top
                         />
+                        <SwitchControl 
+                            :id="TOGGLES.READER_STATUS_PICKER" 
+                            label="Reader Status Picker" 
+                            sub-label="Show a floating status button on reader pages to quickly change reading status"
+                            v-model="readerStatusPicker"
+                            margin-top
+                        />
 
                     </div>
                 </SettingsCard>
@@ -72,7 +79,8 @@ const {
     quickActions, 
     progressTracking,
     familyFriendlyEnabled,
-    libraryShowRibbons
+    libraryShowRibbons,
+    readerStatusPicker
 } = storeToRefs(settingsStore);
 
 const bindSetting = (refValue, key) => {
@@ -83,6 +91,7 @@ bindSetting(quickActions, 'quickActions');
 bindSetting(progressTracking, 'progressTracking');
 bindSetting(familyFriendlyEnabled, 'familyFriendlyEnabled');
 bindSetting(libraryShowRibbons, 'libraryShowRibbons');
+bindSetting(readerStatusPicker, 'readerStatusPicker');
 </script>
 
 <style scoped lang="scss">

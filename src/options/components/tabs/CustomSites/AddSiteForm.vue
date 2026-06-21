@@ -29,11 +29,29 @@
                 />
             </div>
             <div class="form-group">
-                <label for="newSiteType">Website Type</label>
-                <select id="newSiteType" v-model="newSiteType" class="input-field select-field">
-                    <option value="manga">Manga</option>
-                    <option value="anime">Anime</option>
-                </select>
+                <label>Website Type</label>
+                <div class="type-toggle-group">
+                    <button
+                        type="button"
+                        id="siteTypeManga"
+                        class="type-toggle-btn"
+                        :class="{ active: newSiteType === 'manga' }"
+                        @click="newSiteType = 'manga'"
+                    >
+                        <span class="icon-svg icon-book" style="font-size: 15px;"></span>
+                        Manga
+                    </button>
+                    <button
+                        type="button"
+                        id="siteTypeAnime"
+                        class="type-toggle-btn"
+                        :class="{ active: newSiteType === 'anime' }"
+                        @click="newSiteType = 'anime'"
+                    >
+                        <span class="icon-svg icon-play" style="font-size: 15px;"></span>
+                        Anime
+                    </button>
+                </div>
             </div>
             <button 
                 class="btn btn-primary"
@@ -159,4 +177,39 @@ async function startAddSite() {
         border-color: var(--accent-primary);
     }
 }
+
+.type-toggle-group {
+    display: flex;
+    gap: 8px;
+
+    .type-toggle-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: var(--bg-body);
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.18s ease;
+
+        &:hover {
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+        }
+
+        &.active {
+            border-color: var(--accent-primary);
+            background: rgba(var(--accent-primary-rgb, 67, 24, 255), 0.12);
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+    }
+}
+
 </style>

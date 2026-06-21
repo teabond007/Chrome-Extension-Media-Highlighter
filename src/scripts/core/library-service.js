@@ -30,6 +30,25 @@ function slugify(title) {
 }
 
 /**
+ * Normalizes status strings based on the media type (anime vs manga).
+ * @param {string} status - Current status
+ * @param {string} type - Media type ('anime' or 'manga')
+ * @returns {string} Normalized status
+ */
+export function alignStatusForMediaType(status, type) {
+    if (type === 'anime') {
+        if (status === 'Reading' || !status || status === 'Add to Library') return 'Watching';
+        if (status === 'Plan to Read') return 'Plan to Watch';
+        if (status === 'Re-reading') return 'Re-watching';
+    } else {
+        if (status === 'Watching' || !status || status === 'Add to Library') return 'Reading';
+        if (status === 'Plan to Watch') return 'Plan to Read';
+        if (status === 'Re-watching') return 'Re-reading';
+    }
+    return status;
+}
+
+/**
  * Finds a matching entry in the library using source ID, slug, or title.
  * @param {Array} library - Full library array
  * @param {Object} query - Search query with title, slug, source, sourceId fields
@@ -38,25 +57,16 @@ function slugify(title) {
 export function findEntry(library, query) {
     console.log("[LibraryService] Starting findEntry to find matching saved " + (query.type || 'manga') + "!");
     try {
-        var title = query.title;
-        console.log("[LibraryService] Title we are looking for is: " + title);
-        
-        var normalizedTitle = slugify(title);
-        console.log("[LibraryService] Normalized title is: " + normalizedTitle);
-
-        for (var i = 0; i < library.length; i++) {
-            var e = library[i];
-            var entryTitle = e.title;
-            var normalizedEntryTitle = slugify(entryTitle);
-            
-            if (normalizedEntryTitle === normalizedTitle) {
-                console.log("[LibraryService] Hurrah! Found a matching entry: " + e.title);
-                return e;
-            }
+        const title = query.title;
+        const normalizedTitle = slugify(title);
+        const match = library.find(e => e && slugify(e.title) === normalizedTitle);
+        if (match) {
+            console.log("[LibraryService] Hurrah! Found a matching entry: " + match.title);
+            return match;
         }
         console.log("[LibraryService] No entry was found matching title: " + title);
     } catch (err) {
-        console.log("[LibraryService] Error in findEntry: " + err);
+        console.error("[LibraryService] Error in findEntry:", err);
     }
     return undefined;
 }
@@ -69,12 +79,7 @@ export function findEntry(library, query) {
  */
 export function fuzzyMatch(needle, haystack) {
     if (!needle || !haystack) return false;
-    
-    // Just check if the string contains the other string
-    // Use includes() for a simple fuzzy check
-    var n = needle.toLowerCase();
-    var h = haystack.toLowerCase();
-    return h.includes(n);
+    return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
 /**
@@ -87,10 +92,9 @@ export function fuzzyMatch(needle, haystack) {
 export function fuzzyScore(needle, haystack) {
     if (!needle || !haystack) return 0;
     
-    var n = needle.toLowerCase();
-    var h = haystack.toLowerCase();
+    const n = needle.toLowerCase();
+    const h = haystack.toLowerCase();
     
-    // Very simple scoring logic
     if (h === n) return 1000;
     if (h.startsWith(n)) return 500;
     if (h.includes(n)) return 100;
@@ -112,18 +116,16 @@ export async function loadLibrary() {
 
     // Sanitize entries to ensure data integrity
     list.forEach(entry => {
-        if (entry.anilistData) {
-            // Ensure genres is an array
-            if (entry.anilistData.genres !== undefined && !Array.isArray(entry.anilistData.genres)) {
-                entry.anilistData.genres = typeof entry.anilistData.genres === 'string' ? [entry.anilistData.genres] : [];
+        if (entry && entry.anilistData) {
+            const ani = entry.anilistData;
+            if (ani.genres !== undefined && !Array.isArray(ani.genres)) {
+                ani.genres = typeof ani.genres === 'string' ? [ani.genres] : [];
             }
-            // Ensure synonyms is an array
-            if (entry.anilistData.synonyms !== undefined && !Array.isArray(entry.anilistData.synonyms)) {
-                entry.anilistData.synonyms = typeof entry.anilistData.synonyms === 'string' ? [entry.anilistData.synonyms] : [];
+            if (ani.synonyms !== undefined && !Array.isArray(ani.synonyms)) {
+                ani.synonyms = typeof ani.synonyms === 'string' ? [ani.synonyms] : [];
             }
-            // Ensure tags is an array
-            if (entry.anilistData.tags !== undefined && !Array.isArray(entry.anilistData.tags)) {
-                entry.anilistData.tags = typeof entry.anilistData.tags === 'string' ? [{ name: entry.anilistData.tags }] : [];
+            if (ani.tags !== undefined && !Array.isArray(ani.tags)) {
+                ani.tags = typeof ani.tags === 'string' ? [{ name: ani.tags }] : [];
             }
         }
     });
@@ -139,82 +141,44 @@ export async function loadLibrary() {
 export async function upsertEntry(entryData) {
     console.log("[LibraryService] upsertEntry called for: " + (entryData ? entryData.title : "null"));
     try {
-        var library = await loadLibrary();
+        const library = await loadLibrary();
         console.log("[LibraryService] Loaded library, count: " + library.length);
         
-        var matchTitle = slugify(entryData.title);
-        var existingIdx = -1;
-        
-        // Loop and look for a title match
-        for (var i = 0; i < library.length; i++) {
-            if (library[i] && library[i].title) {
-                var currentTitle = slugify(library[i].title);
-                if (currentTitle === matchTitle) {
-                    existingIdx = i;
-                    console.log("[LibraryService] Found existing entry to update at index: " + i);
-                    break;
-                }
-            }
-        }
-
-        var now = Date.now();
-        var updatedEntry;
+        const matchTitle = slugify(entryData.title);
+        const existingIdx = library.findIndex(e => e && slugify(e.title) === matchTitle);
+        const now = Date.now();
+        let updatedEntry;
 
         if (existingIdx !== -1) {
-            // Update the existing entry
             console.log("[LibraryService] Updating existing " + (entryData.type || 'manga') + " entry in library: " + entryData.title);
-            var entry = library[existingIdx];
+            const entry = {
+                ...library[existingIdx],
+                ...entryData,
+                lastUpdated: now
+            };
+            entry.status = alignStatusForMediaType(entry.status, entry.type);
             
-            // Copy the data manually
-            for (var key in entryData) {
-                entry[key] = entryData[key];
-            }
-            
-            // Align status depending on the type
-            if (entry.type === 'anime') {
-                if (entry.status === 'Reading' || !entry.status || entry.status === 'Add to Library') {
-                    entry.status = 'Watching';
-                } else if (entry.status === 'Plan to Read') {
-                    entry.status = 'Plan to Watch';
-                } else if (entry.status === 'Re-reading') {
-                    entry.status = 'Re-watching';
-                }
-            } else {
-                if (entry.status === 'Watching' || !entry.status || entry.status === 'Add to Library') {
-                    entry.status = 'Reading';
-                } else if (entry.status === 'Plan to Watch') {
-                    entry.status = 'Plan to Read';
-                } else if (entry.status === 'Re-watching') {
-                    entry.status = 'Re-reading';
-                }
-            }
-            
-            entry.lastUpdated = now;
             library[existingIdx] = entry;
             updatedEntry = entry;
         } else {
-            // Create a new entry
             console.log("[LibraryService] Creating a brand new " + (entryData.type || 'manga') + " entry in library: " + entryData.title);
-            var newEntry = {};
-            newEntry.status = entryData.type === 'anime' ? 'Watching' : DEFAULT_STATUS;
+            const newEntry = {
+                status: entryData.type === 'anime' ? 'Watching' : DEFAULT_STATUS,
+                ...entryData,
+                lastRead: now,
+                lastUpdated: now
+            };
+            newEntry.status = alignStatusForMediaType(newEntry.status, newEntry.type);
             
-            for (var key in entryData) {
-                newEntry[key] = entryData[key];
-            }
-            
-            newEntry.lastRead = now;
-            newEntry.lastUpdated = now;
             library.push(newEntry);
             updatedEntry = newEntry;
         }
 
-        var finalLibrary = Array.isArray(library) ? library : [];
-        console.log("[LibraryService] Saving modified library to chrome local storage...");
-        await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(finalLibrary)) });
+        await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(library)) });
         console.log("[LibraryService] Saved successfully!");
         return updatedEntry;
     } catch (err) {
-        console.log("[LibraryService] Error: " + err);
+        console.error("[LibraryService] Error in upsertEntry:", err);
         return null;
     }
 }
@@ -231,12 +195,12 @@ export async function updateProgress(query, progress) {
     const entry = findEntry(library, query);
 
     if (!entry) {
-        var newEntryData = query;
-        newEntryData.lastReadChapter = progress.chapter;
-        newEntryData.lastReaderUrl = progress.url;
-        newEntryData.lastRead = Date.now();
-        
-        return await upsertEntry(newEntryData);
+        return await upsertEntry({
+            ...query,
+            lastReadChapter: progress.chapter,
+            lastReaderUrl: progress.url,
+            lastRead: Date.now()
+        });
     }
 
     // Only update if chapter is newer or same
@@ -250,31 +214,12 @@ export async function updateProgress(query, progress) {
         entry[LIBRARY_ENTRY_KEYS.LAST_UPDATED] = Date.now();
     }
 
-    // Ensure type and status are synchronized
     if (query.type) {
         entry.type = query.type;
-        if (entry.type === 'anime') {
-            if (entry.status === 'Reading' || !entry.status || entry.status === 'Add to Library') {
-                entry.status = 'Watching';
-            } else if (entry.status === 'Plan to Read') {
-                entry.status = 'Plan to Watch';
-            } else if (entry.status === 'Re-reading') {
-                entry.status = 'Re-watching';
-            }
-        } else {
-            if (entry.status === 'Watching' || !entry.status || entry.status === 'Add to Library') {
-                entry.status = 'Reading';
-            } else if (entry.status === 'Plan to Watch') {
-                entry.status = 'Plan to Read';
-            } else if (entry.status === 'Re-watching') {
-                entry.status = 'Re-reading';
-            }
-        }
+        entry.status = alignStatusForMediaType(entry.status, entry.type);
     }
 
-    const finalLibrary = Array.isArray(library) ? library : [];
-    await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(finalLibrary)) });
-
+    await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(library)) });
     return entry;
 }
 
@@ -288,7 +233,6 @@ export async function trackReadChapter(mangaQuery, chapter) {
     const data = await chrome.storage.local.get([DATA.READING_HISTORY]);
     const history = data[DATA.READING_HISTORY] || {};
 
-    // Use slug as the primary key for history if available, else standard ID
     const key = mangaQuery.slug || mangaQuery[LIBRARY_ENTRY_KEYS.MANGA_SLUG] || getMangaId(mangaQuery);
 
     if (!history[key]) history[key] = [];
@@ -318,28 +262,21 @@ export async function loadPersonalData() {
  * @returns {Promise<Object>} Updated personal data entry
  */
 export async function savePersonalData(entry, updates) {
-    var allData = await loadPersonalData();
-    var id = getMangaId(entry);
-    var personalData = allData[id];
+    const allData = await loadPersonalData();
+    const id = getMangaId(entry);
+    const personalData = allData[id] || { notes: '', rating: 0 };
     
-    if (personalData == null) {
-        personalData = {
-            notes: '',
-            rating: 0
-        };
+    const updated = {
+        ...personalData,
+        ...updates,
+        lastModified: Date.now()
+    };
+    
+    if (updated.notes !== undefined) {
+        updated.notes = updated.notes.trim();
     }
     
-    // Copy the updates manually
-    if (updates.notes != undefined) {
-        personalData.notes = updates.notes;
-    }
-    if (updates.rating != undefined) {
-        personalData.rating = updates.rating;
-    }
-    
-    personalData.lastModified = Date.now();
-    allData[id] = personalData;
-
+    allData[id] = updated;
     await chrome.storage.local.set({ [DATA.PERSONAL_DATA]: allData });
     return allData[id];
 }

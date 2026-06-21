@@ -3,8 +3,9 @@
  * Automatically saves chapter progress after user engagement threshold.
  */
 
-import { PROGRESS_CONFIG, LIBRARY_ENTRY_KEYS, TOGGLES } from '../../../config.js';
+import { PROGRESS_CONFIG, LIBRARY_ENTRY_KEYS, TOGGLES, DATA, STATUS_COLORS } from '../../../config.js';
 import * as LibraryService from '../library-service.js';
+import { OverlayFactory } from '../overlay-factory.js';
 
 /**
  * ProgressTracker monitors reading activity and saves progress.
@@ -14,12 +15,15 @@ class ProgressTracker {
     /**
      * Creates a new ProgressTracker instance.
      * @param {Object} adapter - Platform adapter with URL parsing
+     * @param {Object} settings - Extension settings from Chrome storage
      */
-    constructor(adapter) {
+    constructor(adapter, settings) {
         this.adapter = adapter;
+        this.settings = settings || {};
         this.currentQuery = null;
         this.saveTimeout = null;
         this.isSaved = false;
+        this.statusButton = null;
     }
 
     /**
@@ -94,15 +98,24 @@ class ProgressTracker {
      */
     setupScrollTracking() {
         let scrollSaved = false;
+        let ticking = false;
         
         this.scrollListener = () => {
             if (scrollSaved || this.isSaved) return;
             
-            const scrollPercent = window.scrollY / (document.body.scrollHeight - window.innerHeight);
-            
-            if (scrollPercent > PROGRESS_CONFIG.SCROLL_THRESHOLD) {
-                scrollSaved = true;
-                this.saveProgress();
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const scrollHeight = document.body.scrollHeight - window.innerHeight;
+                    if (scrollHeight > 0) {
+                        const scrollPercent = window.scrollY / scrollHeight;
+                        if (scrollPercent > PROGRESS_CONFIG.SCROLL_THRESHOLD) {
+                            scrollSaved = true;
+                            this.saveProgress();
+                        }
+                    }
+                    ticking = false;
+                });
+                ticking = true;
             }
         };
 
@@ -141,6 +154,11 @@ class ProgressTracker {
             // Display a floating notification on the reader page only when a new entry is added
             if (isNewEntry && entry) {
                 this.showFloatingNotification(entry.title, entry.type);
+            }
+
+            // Inject the floating status picker button if enabled in settings
+            if (this.settings[TOGGLES.READER_STATUS_PICKER] !== false && entry) {
+                this.injectStatusButton(entry);
             }
 
             if (entry && !entry.anilistData) {
@@ -189,6 +207,152 @@ class ProgressTracker {
         } catch (e) {
              console.warn('[ProgressTracker] Metadata request failed:', e);
         }
+    }
+
+    getStatusColor(status) {
+        if (!status) return 'rgba(255,255,255,0.3)';
+        const normalized = status.toLowerCase().trim();
+        
+        // 1. Check custom statuses first
+        const customStatuses = this.settings[DATA.CUSTOM_STATUSES];
+        if (Array.isArray(customStatuses)) {
+            const matched = customStatuses.find(c => c.name.toLowerCase() === normalized);
+            if (matched) return matched.color;
+        }
+
+        // 2. Default statuses fallback
+        for (const key in STATUS_COLORS) {
+            if (normalized === key.toLowerCase() || normalized.includes(key.toLowerCase())) {
+                return STATUS_COLORS[key];
+            }
+        }
+        return 'rgba(255,255,255,0.3)';
+    }
+
+    /**
+     * Injects the floating bottom-left status picker button onto the reader page.
+     * Reuses OverlayFactory.mountStatusPicker for the picker popup.
+     * @param {Object} entry - Current library entry
+     */
+    injectStatusButton(entry) {
+        // Remove any pre-existing button from a previous init
+        var existing = document.getElementById('bmh-reader-status-btn');
+        if (existing) existing.remove();
+
+        this.injectStatusButtonStyles();
+
+        var self = this;
+        var currentEntry = entry;
+        var customStatuses = Array.isArray(this.settings[DATA.CUSTOM_STATUSES])
+            ? this.settings[DATA.CUSTOM_STATUSES]
+            : [];
+
+        var btn = document.createElement('button');
+        btn.id = 'bmh-reader-status-btn';
+        btn.className = 'bmh-reader-status-btn';
+        btn.title = 'Change reading status';
+
+        var dot = document.createElement('span');
+        dot.className = 'bmh-reader-status-dot';
+        dot.style.background = this.getStatusColor(currentEntry.status);
+
+        var label = document.createElement('span');
+        label.className = 'bmh-reader-status-label';
+        label.textContent = currentEntry.status || 'Reading';
+
+        btn.appendChild(dot);
+        btn.appendChild(label);
+        document.body.appendChild(btn);
+        this.statusButton = btn;
+
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            OverlayFactory.mountStatusPicker(
+                btn,
+                currentEntry,
+                customStatuses,
+                function(newStatus) {
+                    self.saveStatusFromReader(currentEntry, newStatus);
+                    // Update dot + label reactively
+                    dot.style.background = self.getStatusColor(newStatus);
+                    label.textContent = newStatus;
+                    currentEntry.status = newStatus;
+                }
+            );
+        });
+    }
+
+    async saveStatusFromReader(entry, newStatus) {
+        try {
+            const data = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES]);
+            const entries = data[DATA.LIBRARY_ENTRIES] || [];
+            const normalizedTitle = (entry.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            const match = entries.find(e => (e.title || '').toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedTitle);
+            if (match) {
+                match.status = newStatus;
+                match.lastUpdated = Date.now();
+            }
+
+            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entries });
+            console.log('[ProgressTracker] Reader status updated: ' + newStatus);
+        } catch (err) {
+            console.warn('[ProgressTracker] Failed to save reader status:', err);
+        }
+    }
+
+    /**
+     * Injects CSS styles for the floating reader status button.
+     */
+    injectStatusButtonStyles() {
+        if (document.getElementById('bmh-reader-status-styles')) return;
+
+        var style = document.createElement('style');
+        style.id = 'bmh-reader-status-styles';
+        style.textContent = `
+            .bmh-reader-status-btn {
+                position: fixed;
+                bottom: 24px;
+                left: 24px;
+                z-index: 2147483646;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 10px 16px;
+                background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 50px;
+                color: #fff;
+                font-family: system-ui, -apple-system, sans-serif;
+                font-size: 13px;
+                font-weight: 500;
+                cursor: pointer;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+                transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                animation: bmh-status-btn-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            }
+            .bmh-reader-status-btn:hover {
+                transform: translateY(-3px) scale(1.04);
+                box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+                border-color: rgba(255,255,255,0.2);
+            }
+            .bmh-reader-status-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                flex-shrink: 0;
+                transition: background 0.3s ease;
+                box-shadow: 0 0 8px currentColor;
+            }
+            .bmh-reader-status-label {
+                white-space: nowrap;
+            }
+            @keyframes bmh-status-btn-in {
+                from { opacity: 0; transform: translateY(16px) scale(0.9); }
+                to   { opacity: 1; transform: translateY(0) scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     /**
@@ -317,6 +481,10 @@ class ProgressTracker {
         if (this.scrollListener) {
             window.removeEventListener('scroll', this.scrollListener);
             this.scrollListener = null;
+        }
+        if (this.statusButton) {
+            this.statusButton.remove();
+            this.statusButton = null;
         }
     }
 }

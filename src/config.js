@@ -11,9 +11,9 @@
  */
 export const STATUS_COLORS = {
     // Display names (used by StatusPicker, overlay tooltips)
-    'Reading': '#4ade80',
-    'Watching': '#4ade80',
-    'Completed': '#60a5fa',
+    'Reading': '#10b981',
+    'Watching': '#10b981',
+    'Completed': '#3b82f6',
     'Plan to Read': '#fbbf24',
     'Plan to Watch': '#fbbf24',
     'On-Hold': '#f97316',
@@ -24,16 +24,17 @@ export const STATUS_COLORS = {
     'HasHistory': '#9ca3af',
 
     // Internal lowercase keys (used by library card factory, SCSS-driven status classes)
-    'reading': '#4ade80',
-    'watching': '#4ade80',
-    'read': '#9f9f9f',
-    'completed': '#60a5fa',
+    'reading': '#10b981',
+    'watching': '#10b981',
+    'read': '#9ca3af',
+    'completed': '#3b82f6',
     'dropped': '#ef4444',
     'onhold': '#f97316',
     'planning': '#fbbf24',
     'plan to watch': '#fbbf24',
+    're-reading': '#a855f7',
     're-watching': '#a855f7',
-    'default': '#8B95A5'
+    'default': '#9ca3af'
 };
 
 /**
@@ -73,6 +74,9 @@ export const TOGGLES = {
     LIBRARY_HIDE_NO_HISTORY: 'libraryHideNoHistory',
     QUICK_ACTIONS: 'quickActions',
     LIBRARY_SHOW_RIBBONS: 'libraryShowStatusRibbon',
+    
+    // Reader Page
+    READER_STATUS_PICKER: 'readerStatusPicker',
     
     IS_CUSTOM_THEME: 'isCustomTheme'
 };

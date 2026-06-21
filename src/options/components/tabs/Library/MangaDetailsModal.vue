@@ -9,10 +9,36 @@
                     <div class="modal-sidebar">
                         <img id="modalCover" :src="coverUrl" alt="Cover" class="modal-cover">
                         <div class="modal-sidebar-info">
-                            <div class="modal-meta-row">
+                            <div class="modal-meta-row modal-status-row">
                                 <span class="modal-meta-label">Status</span>
-                                <div id="modalStatusBadge" class="manga-card-status" :style="statusStyle">
-                                    {{ currentEntry.status }}
+                                <div class="modal-status-control">
+                                    <!-- Current status badge — click to toggle inline picker -->
+                                    <button
+                                        id="modalStatusBadge"
+                                        class="manga-card-status modal-status-badge-btn"
+                                        :style="statusStyle"
+                                        @click="showStatusPicker = !showStatusPicker"
+                                        :title="showStatusPicker ? 'Close' : 'Change status'"
+                                    >
+                                        {{ currentEntry.status }}
+                                        <span class="modal-status-chevron" :class="{ open: showStatusPicker }">▾</span>
+                                    </button>
+                                    <!-- Inline status button row -->
+                                    <transition name="modal-status-expand">
+                                        <div v-if="showStatusPicker" class="modal-status-picker-row">
+                                            <button
+                                                v-for="s in availableStatuses"
+                                                :key="s.name"
+                                                class="modal-status-option"
+                                                :class="{ active: currentEntry.status === s.name }"
+                                                :style="{ '--scolor': s.color }"
+                                                @click="handleStatusSelect(s.name)"
+                                            >
+                                                <span class="modal-status-option-dot" :style="{ background: s.color }"></span>
+                                                {{ s.name }}
+                                            </button>
+                                        </div>
+                                    </transition>
                                 </div>
                             </div>
                             <div class="modal-meta-row">
@@ -144,6 +170,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { getFormatName, getStatusInfo } from '../../../scripts/ui/manga-card-utils.js';
 import * as LibraryService from '../../../../scripts/core/library-service.js';
 import { useLibraryStore } from '../../../scripts/store/library.store.js';
+import { useSettingsStore } from '../../../scripts/store/settings.store.js';
 import { DATA, LIBRARY_ENTRY_KEYS } from '../../../../config.js';
 
 // Shared Components
@@ -151,12 +178,14 @@ import StarRating from './StarRating.vue';
 import NotesEditor from './NotesEditor.vue';
  
 const libraryStore = useLibraryStore();
+const settingsStore = useSettingsStore();
  
 // State
 const isOpen = ref(false);
 const currentEntry = ref({});
 const ani = computed(() => currentEntry.value.anilistData);
 const showChapters = ref(false);
+const showStatusPicker = ref(false);
 const historyChapters = ref([]);
 const personalData = ref({ notes: '', rating: 0 });
 const modalBodyRef = ref(null);
@@ -186,6 +215,28 @@ const statusStyle = computed(() => {
         backgroundColor: info.badgeBg,
         color: info.badgeText
     };
+});
+
+/** All statuses available for this entry type (defaults + custom) */
+const availableStatuses = computed(() => {
+    const isAnime = currentEntry.value?.type === 'anime';
+    const defaults = isAnime ? [
+        { name: 'Watching',      color: '#10b981' },
+        { name: 'Completed',     color: '#3b82f6' },
+        { name: 'Plan to Watch', color: '#fbbf24' },
+        { name: 'On-Hold',       color: '#f97316' },
+        { name: 'Dropped',       color: '#ef4444' },
+        { name: 'Re-watching',   color: '#a855f7' }
+    ] : [
+        { name: 'Reading',       color: '#10b981' },
+        { name: 'Completed',     color: '#3b82f6' },
+        { name: 'Plan to Read',  color: '#fbbf24' },
+        { name: 'On-Hold',       color: '#f97316' },
+        { name: 'Dropped',       color: '#ef4444' },
+        { name: 'Re-reading',    color: '#a855f7' }
+    ];
+    const custom = Array.isArray(settingsStore.customStatuses) ? settingsStore.customStatuses : [];
+    return [...defaults, ...custom];
 });
  
 /**
@@ -338,6 +389,7 @@ const playSuccessAnimation = (targetContainer) => {
 const openModal = async (entry) => {
     currentEntry.value = entry;
     showChapters.value = false;
+    showStatusPicker.value = false;
     isOpen.value = true;
     
     // Load data
@@ -358,7 +410,21 @@ const openModal = async (entry) => {
  
 const closeModal = () => {
     isOpen.value = false;
+    showStatusPicker.value = false;
     libraryStore.selectedEntry = null;
+};
+ 
+/**
+ * Applies the selected status to the current entry and persists it.
+ * @param {string} statusName - The newly selected status
+ */
+const handleStatusSelect = async (statusName) => {
+    if (!currentEntry.value || !statusName) return;
+    currentEntry.value.status = statusName;
+    showStatusPicker.value = false;
+
+    // Persist through the library store so the library view updates reactively
+    await libraryStore.upsertEntry({ ...currentEntry.value, status: statusName });
 };
  
 const toggleChaptersList = () => {
@@ -608,6 +674,86 @@ onMounted(() => {
                                     font-size: 18px;
                                 }
                             }
+
+                            // Inline status picker control
+                            &.modal-status-row {
+                                .modal-status-control {
+                                    display: flex;
+                                    flex-direction: column-reverse; // picker renders above the badge
+                                    gap: 6px;
+                                }
+
+                                .modal-status-badge-btn {
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 6px;
+                                    cursor: pointer;
+                                    border: none;
+                                    background: inherit;
+                                    padding: 4px 10px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    width: fit-content;
+                                    opacity: 0.5; // dim when idle
+                                    transition: opacity 0.2s ease;
+
+                                    .modal-status-chevron {
+                                        font-size: 11px;
+                                        transition: transform 0.2s ease;
+                                        &.open { transform: rotate(180deg); }
+                                    }
+                                }
+
+                                // Brighten the whole control on hover
+                                &:hover .modal-status-badge-btn,
+                                .modal-status-badge-btn:focus {
+                                    opacity: 1;
+                                }
+
+                                .modal-status-picker-row {
+                                    display: flex;
+                                    flex-direction: column;
+                                    gap: 3px;
+                                    padding: 6px;
+                                    background: var(--bg-body);
+                                    border: 1px solid var(--border-color);
+                                    border-radius: var(--radius-sm);
+                                    overflow: hidden;
+                                }
+
+                                .modal-status-option {
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 8px;
+                                    width: 100%;
+                                    padding: 7px 10px;
+                                    border: none;
+                                    border-radius: 6px;
+                                    background: transparent;
+                                    color: var(--text-primary);
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    cursor: pointer;
+                                    text-align: left;
+                                    transition: background 0.12s ease;
+
+                                    &:hover { background: rgba(255,255,255,0.07); }
+
+                                    &.active {
+                                        background: rgba(255,255,255,0.12);
+                                        font-weight: 700;
+                                    }
+
+                                    .modal-status-option-dot {
+                                        width: 9px;
+                                        height: 9px;
+                                        border-radius: 50%;
+                                        flex-shrink: 0;
+                                        box-shadow: 0 0 6px var(--scolor, transparent);
+                                    }
+                                }
+                            }
                         }
                     }
  
@@ -845,5 +991,17 @@ onMounted(() => {
             }
         }
     }
+}
+
+/* Status picker expand/collapse transition (drops UP) */
+.modal-status-expand-enter-active,
+.modal-status-expand-leave-active {
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    transform-origin: bottom center;
+}
+.modal-status-expand-enter-from,
+.modal-status-expand-leave-to {
+    opacity: 0;
+    transform: scaleY(0.85) translateY(6px);
 }
 </style>

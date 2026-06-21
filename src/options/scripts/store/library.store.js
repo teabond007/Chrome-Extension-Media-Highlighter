@@ -9,11 +9,10 @@ import { wipeMangadexCache } from '../../../scripts/core/api/mangadex-api.js';
 import { getMergedMetadata } from '../../../scripts/core/api/metadata-service';
 import { DATA } from '../../../config.js';
 import * as LibraryService from '../../../scripts/core/library-service.js';
-import { useSettingsStore } from './settings.store.js';
 
 export const useLibraryStore = defineStore('library', {
     state: () => ({
-        entries: [], // Array of saved manga objects
+        entries: [], // Array of saved manga/anime objects
         history: {}, // Map of reading history
         personalData: {}, // Map of notes and ratings
         isLoading: true,
@@ -25,19 +24,18 @@ export const useLibraryStore = defineStore('library', {
 
     getters: {
         totalEntries: (state) => state.entries.length,
-        readingEntries: (state) => state.entries.filter(e => e.status === 'Reading' || e.status === 'Watching'),
-        completedEntries: (state) => state.entries.filter(e => e.status === 'Completed'),
-        planToReadEntries: (state) => state.entries.filter(e => e.status === 'Plan to Read' || e.status === 'Plan to Watch'),
-        mangaEntries: (state) => state.entries.filter(e => e.type !== 'anime'),
-        animeEntries: (state) => state.entries.filter(e => e.type === 'anime')
+        readingEntries: (state) => state.entries.filter(e => e && (e.status === 'Reading' || e.status === 'Watching')),
+        completedEntries: (state) => state.entries.filter(e => e && e.status === 'Completed'),
+        planToReadEntries: (state) => state.entries.filter(e => e && (e.status === 'Plan to Read' || e.status === 'Plan to Watch')),
+        mangaEntries: (state) => state.entries.filter(e => e && e.type !== 'anime'),
+        animeEntries: (state) => state.entries.filter(e => e && e.type === 'anime')
     },
 
     actions: {
         async loadLibrary() {
-            console.log("[LibraryStore] loadLibrary function has started!");
+            console.log("[LibraryStore] loadLibrary started");
             this.isLoading = true;
             try {
-             
                 const data = await chrome.storage.local.get([
                     DATA.LIBRARY_ENTRIES, 
                     DATA.READING_HISTORY, 
@@ -45,27 +43,15 @@ export const useLibraryStore = defineStore('library', {
                     DATA.LAST_SYNC_TIME
                 ]);
                 
-                const rawEntries = data[DATA.LIBRARY_ENTRIES];
-                console.log('[LibraryStore] Raw entries retrieved: type=' + typeof rawEntries + ', isArray=' + Array.isArray(rawEntries));
-                
-                if (Array.isArray(rawEntries)) {
-                    console.log('[LibraryStore] Success! Loaded library entries count: ' + rawEntries.length);
-                    this.entries = rawEntries;
-                } else {
-                    console.log('[LibraryStore] Warning! entries retrieved was not an array! We will reset entries to [].');
-                    this.entries = [];
-                }
-
+                this.entries = Array.isArray(data[DATA.LIBRARY_ENTRIES]) ? data[DATA.LIBRARY_ENTRIES] : [];
                 this.history = data[DATA.READING_HISTORY] || {};
                 this.personalData = data[DATA.PERSONAL_DATA] || {};
                 this.lastSync = data[DATA.LAST_SYNC_TIME] || null;
-                console.log("[LibraryStore] Done setting state variables in loadLibrary!");
-
+                console.log("[LibraryStore] Library loaded successfully. Entries count: " + this.entries.length);
             } catch (err) {
-                console.log('[LibraryStore] Error occurred inside loadLibrary: ' + err);
+                console.error('[LibraryStore] Error inside loadLibrary:', err);
             } finally {
                 this.isLoading = false;
-                console.log("[LibraryStore] loadLibrary has finished running!");
             }
         },
 
@@ -78,7 +64,6 @@ export const useLibraryStore = defineStore('library', {
             
             if (changes[DATA.LIBRARY_ENTRIES]) {
                 const newValue = changes[DATA.LIBRARY_ENTRIES].newValue;
-                console.log('[LibraryStore] sync: LibraryEntries changed. New count:', Array.isArray(newValue) ? newValue.length : 'NOT_ARRAY');
                 this.entries = Array.isArray(newValue) ? newValue : [];
             }
             if (changes[DATA.READING_HISTORY]) {
@@ -93,67 +78,34 @@ export const useLibraryStore = defineStore('library', {
         },
 
         /**
-         * Removes a manga entry matching by anilist ID, slug, or title fallback.
+         * Removes a manga entry matching by title.
          * @param {Object} entry - The entry object to remove
          */
         async removeEntry(entry) {
-            console.log('[LibraryStore] removeEntry started!');
+            console.log('[LibraryStore] removeEntry started');
             try {
-                if (!entry) {
-                    console.log('[LibraryStore] The entry passed is null or undefined!');
+                if (!entry?.title) {
+                    console.log('[LibraryStore] Invalid entry passed to removeEntry');
                     return;
                 }
                 
-                var titleToMatch = (entry.title || '').toLowerCase().trim();
-                console.log('[LibraryStore] We want to remove the manga with title: ' + titleToMatch);
-
-                if (!Array.isArray(this.entries)) {
-                    console.log('[LibraryStore] Oh no! entries is not an array, resetting to empty array.');
-                    this.entries = [];
-                    await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: [] });
-                    return;
-                }
-
-                var oldLength = this.entries.length;
-                console.log('[LibraryStore] Number of entries before removal: ' + oldLength);
-
-                // Create a brand new array and push elements that do NOT match the title
-                var newEntriesList = [];
-                for (var i = 0; i < this.entries.length; i++) {
-                    var currentEntry = this.entries[i];
-                    if (currentEntry) {
-                        var currentTitle = (currentEntry.title || '').toLowerCase().trim();
-                        if (currentTitle === titleToMatch) {
-                            console.log('[LibraryStore] Found the match to delete! Skipping: ' + currentEntry.title);
-                        } else {
-                            newEntriesList.push(currentEntry);
-                        }
-                    }
-                }
-
-                this.entries = newEntriesList;
-                var newLength = this.entries.length;
-                console.log('[LibraryStore] Number of entries after removal: ' + newLength);
-
-                console.log('[LibraryStore] Serializing entries list to plain JS array...');
-                var plainString = JSON.stringify(this.entries);
-                var plainEntries = JSON.parse(plainString);
+                const titleToMatch = entry.title.toLowerCase().trim();
+                this.entries = this.entries.filter(e => e && e.title.toLowerCase().trim() !== titleToMatch);
                 
-                console.log('[LibraryStore] Saving new entries list to local chrome storage...');
-                await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: plainEntries });
-                console.log('[LibraryStore] Saved to storage successfully!');
+                await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(this.entries)) });
+                console.log('[LibraryStore] Removed successfully');
             } catch (err) {
-                console.log('[LibraryStore] Error in removeEntry: ' + err);
+                console.error('[LibraryStore] Error in removeEntry:', err);
             }
         },
 
         /**
          * Helper to save the current entries array to storage.
-         * @param {Array} entries - The array of entries to save.
+         * @param {Array} entriesList - The array of entries to save.
          */
-        saveEntries(entries) {
-            this.entries = entries;
-            chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entries });
+        saveEntries(entriesList) {
+            this.entries = entriesList;
+            chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entriesList });
         },
 
         /**
@@ -162,58 +114,33 @@ export const useLibraryStore = defineStore('library', {
          * @param {string} titleOrSlug - The title or slug to match.
          */
         showEntryDetails(titleOrSlug) {
-            console.log("[LibraryStore] showEntryDetails called for titleOrSlug: " + titleOrSlug);
+            console.log("[LibraryStore] showEntryDetails called for: " + titleOrSlug);
             try {
-                if (!titleOrSlug) {
-                    console.log("[LibraryStore] titleOrSlug is empty, exiting.");
-                    return;
-                }
-                var target = titleOrSlug.toLowerCase().trim();
-                console.log("[LibraryStore] Normalized target search term is: " + target);
-
-                var entryFound = null;
+                if (!titleOrSlug) return;
+                const target = titleOrSlug.toLowerCase().trim();
 
                 // Loop 1: search for an exact title match first
-                console.log("[LibraryStore] Loop 1: Looking for exact title match...");
-                for (var i = 0; i < this.entries.length; i++) {
-                    var e = this.entries[i];
-                    if (e && e.title) {
-                        var currentTitle = e.title.toLowerCase().trim();
-                        if (currentTitle === target) {
-                            console.log("[LibraryStore] Found exact title match! Entry: " + e.title);
-                            entryFound = e;
-                            break;
-                        }
-                    }
-                }
+                let entryFound = this.entries.find(e => e?.title && e.title.toLowerCase().trim() === target);
 
                 // Loop 2: fuzzy or slug-based match if we found nothing in Loop 1
-                if (entryFound == null) {
-                    console.log("[LibraryStore] Loop 2: Looking for fallback matching...");
-                    var targetSlug = target.replace(/[^a-z0-9]/g, '');
-                    
-                    for (var j = 0; j < this.entries.length; j++) {
-                        var e = this.entries[j];
-                        if (e && e.title) {
-                            var eSlug = e.title.toLowerCase().replace(/[^a-z0-9]/g, '');
-                            var eMangaSlug = (e.mangaSlug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                            if (eSlug === targetSlug || eMangaSlug === targetSlug || eSlug.indexOf(targetSlug) !== -1 || targetSlug.indexOf(eSlug) !== -1) {
-                                console.log("[LibraryStore] Found slug/fuzzy match! Entry: " + e.title);
-                                entryFound = e;
-                                break;
-                            }
-                        }
-                    }
+                if (!entryFound) {
+                    const targetSlug = target.replace(/[^a-z0-9]/g, '');
+                    entryFound = this.entries.find(e => {
+                        if (!e?.title) return false;
+                        const eSlug = e.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const eMangaSlug = (e.mangaSlug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return eSlug === targetSlug || eMangaSlug === targetSlug || eSlug.includes(targetSlug) || targetSlug.includes(eSlug);
+                    });
                 }
 
-                if (entryFound != null) {
+                if (entryFound) {
                     console.log("[LibraryStore] Setting selectedEntry to: " + entryFound.title);
                     this.selectedEntry = entryFound;
                 } else {
-                    console.log("[LibraryStore] Warning! Could not find any entry in library matching: " + titleOrSlug);
+                    console.warn("[LibraryStore] Could not find any entry in library matching: " + titleOrSlug);
                 }
             } catch (err) {
-                console.log("[LibraryStore] Error in showEntryDetails: " + err);
+                console.error("[LibraryStore] Error in showEntryDetails:", err);
             }
         },
 
@@ -222,11 +149,8 @@ export const useLibraryStore = defineStore('library', {
          * @param {Object} entryData - The data to upsert
          */
         async upsertEntry(entryData) {
-            // Using service for logic, store will update via syncFromStorage (if set up)
-            // or we manually update it here for immediate feedback.
             const updated = await LibraryService.upsertEntry(entryData);
             
-            // Local update for immediate UI response
             const idx = this.entries.findIndex(e => 
                 LibraryService.getMangaId(e) === LibraryService.getMangaId(updated)
             );
@@ -239,7 +163,6 @@ export const useLibraryStore = defineStore('library', {
             return updated;
         },
 
-        
         /**
          * Sync metadata for entries in the library.
          * @param {boolean} wipeAll - If true, clears existing metadata to force a fresh lookup.
@@ -258,30 +181,21 @@ export const useLibraryStore = defineStore('library', {
             console.log(wipeAll ? "Starting full forced library sync..." : "Starting missing info sync...");
 
             try {
-                var updatedEntries = [];
-                
-                for (var i = 0; i < this.entries.length; i++) {
-                    var entry = this.entries[i];
-                    
-                    if (wipeAll == true) {
-                        entry.anilistData = undefined;
-                        entry.lastChecked = undefined;
-                    }
-                    
-                    updatedEntries.push(entry);
-                }
-
-                if (wipeAll == true) {
+                if (wipeAll) {
+                    this.entries.forEach(entry => {
+                        if (entry) {
+                            entry.anilistData = undefined;
+                            entry.lastChecked = undefined;
+                        }
+                    });
                     await wipeMangadexCache();
                     console.log("Cleared MangaDex cache.");
                 }
 
-                await this.fetchMissingMetadata(updatedEntries);
-                
+                await this.fetchMissingMetadata(this.entries);
                 alert(wipeAll ? "Full library sync completed!" : "Missing info sync completed!");
             } catch (e) {
                 console.error("Sync failed:", e);
-               
             } finally {
                 this.isSyncing = false;
                 this.syncProgress = { current: 0, total: 0, title: '' };
@@ -290,21 +204,18 @@ export const useLibraryStore = defineStore('library', {
 
         async fetchMissingMetadata(entriesList) {
             const missing = entriesList.filter(e => 
-                (!e.anilistData || (e.anilistData.id && !e.anilistData.chapters)) &&
+                e && (!e.anilistData || (e.anilistData.id && !e.anilistData.chapters)) &&
                 (!e.lastChecked || (Date.now() - e.lastChecked > 3600000))
             );
 
             if (missing.length === 0) return;
 
             this.syncProgress = { current: 0, total: missing.length, title: 'Starting...' };
-            // Notify global listeners if any
             window.dispatchEvent(new CustomEvent('library-sync-start', { detail: { total: missing.length } }));
 
             for (let i = 0; i < missing.length; i++) {
                 const staleEntry = missing[i];
-                
-                // Always get fresh ref in case syncFromStorage updated it
-                const liveEntry = entriesList.find(e => e.title === staleEntry.title);
+                const liveEntry = entriesList.find(e => e && e.title === staleEntry.title);
                 if (!liveEntry) continue;
 
                 this.syncProgress = { current: i + 1, total: missing.length, title: liveEntry.title };
@@ -313,25 +224,19 @@ export const useLibraryStore = defineStore('library', {
                 }));
 
                 try {
-                    // Use centralized metadata service
                     const data = await getMergedMetadata(liveEntry.title, liveEntry.type);
-
                     if (data != null) {
                         liveEntry.anilistData = data;
                     }
                     liveEntry.lastChecked = Date.now();
-                    
-                    // Throttle
-                    await new Promise(r => setTimeout(r, 600));
+                    await new Promise(r => setTimeout(r, 600)); // Throttle rate limit
                 } catch (err) {
                     console.error('Error fetching metadata for', liveEntry.title, err);
                 }
             }
 
-            // Save all updates once after the loop
-            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entriesList });
+            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(entriesList)) });
             this.entries = entriesList;
-            
             window.dispatchEvent(new CustomEvent('library-sync-complete'));
         }
     }

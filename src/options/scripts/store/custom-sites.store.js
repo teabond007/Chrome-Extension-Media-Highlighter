@@ -6,23 +6,6 @@
 import { defineStore } from 'pinia';
 import { DATA } from '../../../config.js';
 
-/**
- * @typedef {Object} CustomSiteConfig
- * @property {string} id - UUID for the site configuration
- * @property {string} hostname - The site hostname (e.g., "bato.to")
- * @property {string} [url] - The exact listing URL provided by user
- * @property {string} name - User-friendly display name
- * @property {string} selectors.card - Manga card container selector
- * @property {string} selectors.title - Title element selector (relative to card)
- * @property {Object} [readerSelectors] - CSS selectors for reader page elements
- * @property {string} [readerSelectors.readerDetect] - Element whose presence identifies a reader page
- * @property {string} [readerSelectors.readerTitle] - Manga title on reader page
- * @property {string} [readerSelectors.readerChapter] - Chapter number/name on reader page
- * @property {boolean} enabled - Whether this site config is active
- * @property {number} createdAt - Timestamp of creation
- * @property {number} updatedAt - Timestamp of last update
- */
-
 export const useCustomSitesStore = defineStore('customSites', {
     state: () => ({
         sites: [],
@@ -31,85 +14,50 @@ export const useCustomSitesStore = defineStore('customSites', {
     }),
 
     getters: {
-        enabledSites: function(state) {
-            console.log("getting enabled sites");
-            var result = [];
-            for (var i = 0; i < state.sites.length; i++) {
-                if (state.sites[i] && state.sites[i].enabled == true) {
-                    result.push(state.sites[i]);
-                }
-            }
-            return result;
-        },
-        
-        getSiteByHostname: function(state) {
-            return function(hostname) {
-                console.log("find site by hostname: " + hostname);
-                for (var i = 0; i < state.sites.length; i++) {
-                    if (state.sites[i] && state.sites[i].hostname === hostname) {
-                        return state.sites[i];
-                    }
-                }
-                return null;
-            };
-        },
-        
-        getSiteById: function(state) {
-            return function(id) {
-                console.log("find site by id: " + id);
-                for (var i = 0; i < state.sites.length; i++) {
-                    if (state.sites[i] && state.sites[i].id === id) {
-                        return state.sites[i];
-                    }
-                }
-                return null;
-            };
-        }
+        enabledSites: (state) => state.sites.filter(s => s && s.enabled === true),
+        getSiteByHostname: (state) => (hostname) => state.sites.find(s => s && s.hostname === hostname) || null,
+        getSiteById: (state) => (id) => state.sites.find(s => s && s.id === id) || null
     },
 
     actions: {
         async loadSites() {
-            console.log("loading custom sites from storage");
+            console.log("[CustomSitesStore] loading custom sites from storage");
             this.isLoading = true;
             try {
-                var data = await chrome.storage.local.get([DATA.CUSTOM_SITES]);
-                var list = data[DATA.CUSTOM_SITES] || [];
-                console.log("loaded sites count: " + list.length);
-                this.sites = list;
+                const data = await chrome.storage.local.get([DATA.CUSTOM_SITES]);
+                this.sites = data[DATA.CUSTOM_SITES] || [];
+                console.log("[CustomSitesStore] loaded sites count: " + this.sites.length);
             } catch (err) {
-                console.log("load sites error: " + err);
+                console.error("[CustomSitesStore] load sites error:", err);
             } finally {
                 this.isLoading = false;
             }
         },
 
         async saveSites() {
-            console.log("saving custom sites to storage");
+            console.log("[CustomSitesStore] saving custom sites to storage");
             try {
-                var serialized = JSON.stringify(this.sites);
-                var parsed = JSON.parse(serialized);
-                await chrome.storage.local.set({ [DATA.CUSTOM_SITES]: parsed });
-                console.log("sites saved successfully");
-                
-                // notify background script
+                const serialized = JSON.parse(JSON.stringify(this.sites));
+                await chrome.storage.local.set({ [DATA.CUSTOM_SITES]: serialized });
+                console.log("[CustomSitesStore] sites saved successfully");
                 chrome.runtime.sendMessage({ type: 'custom-sites-updated' });
             } catch (err) {
-                console.log("save sites error: " + err);
+                console.error("[CustomSitesStore] save sites error:", err);
             }
         },
 
         async addSite(siteData) {
-            console.log("adding new custom site");
+            console.log("[CustomSitesStore] adding new custom site");
             try {
-                var newSite = {
+                const newSite = {
                     id: crypto.randomUUID(),
                     hostname: siteData.hostname || '',
-                    url: siteData.url || ('https://' + (siteData.hostname || '')),
+                    url: siteData.url || (`https://${siteData.hostname || ''}`),
                     name: siteData.name || 'Untitled Site',
                     type: siteData.type || 'manga',
                     selectors: {
-                        card: (siteData.selectors ? siteData.selectors.card : '') || '',
-                        title: (siteData.selectors ? siteData.selectors.title : '') || ''
+                        card: siteData.selectors?.card || '',
+                        title: siteData.selectors?.title || ''
                     },
                     readerSelectors: siteData.readerSelectors || {
                         readerDetect: '',
@@ -123,34 +71,25 @@ export const useCustomSitesStore = defineStore('customSites', {
 
                 this.sites.push(newSite);
                 await this.saveSites();
-                console.log("added site: " + newSite.name);
+                console.log("[CustomSitesStore] added site: " + newSite.name);
                 return newSite;
             } catch (err) {
-                console.log("add site error: " + err);
+                console.error("[CustomSitesStore] add site error:", err);
                 return null;
             }
         },
 
         async updateSite(id, updates) {
-            console.log("updating site: " + id);
+            console.log("[CustomSitesStore] updating site:", id);
             try {
-                var idx = -1;
-                for (var i = 0; i < this.sites.length; i++) {
-                    if (this.sites[i] && this.sites[i].id === id) {
-                        idx = i;
-                        break;
-                    }
-                }
-
-                if (idx === -1) {
-                    console.log("site not found for update");
+                const site = this.sites.find(s => s && s.id === id);
+                if (!site) {
+                    console.log("[CustomSitesStore] site not found for update");
                     return;
                 }
 
-                var site = this.sites[idx];
-                
-                // copy updates manually
-                for (var key in updates) {
+                // Copy updates
+                Object.keys(updates).forEach(key => {
                     if (key === 'selectors' && updates.selectors) {
                         site.selectors = {
                             card: updates.selectors.card || '',
@@ -165,107 +104,79 @@ export const useCustomSitesStore = defineStore('customSites', {
                     } else {
                         site[key] = updates[key];
                     }
-                }
-                
+                });
+
                 site.updatedAt = Date.now();
-                this.sites[idx] = site;
-                
                 await this.saveSites();
-                console.log("updated site successfully");
+                console.log("[CustomSitesStore] updated site successfully");
             } catch (err) {
-                console.log("update site error: " + err);
+                console.error("[CustomSitesStore] update site error:", err);
             }
         },
 
         async removeSite(id) {
-            console.log("removing site: " + id);
+            console.log("[CustomSitesStore] removing site:", id);
             try {
-                var newSites = [];
-                for (var i = 0; i < this.sites.length; i++) {
-                    if (this.sites[i] && this.sites[i].id !== id) {
-                        newSites.push(this.sites[i]);
-                    }
-                }
-                this.sites = newSites;
+                this.sites = this.sites.filter(s => s && s.id !== id);
                 await this.saveSites();
-                console.log("site removed");
+                console.log("[CustomSitesStore] site removed");
             } catch (err) {
-                console.log("remove site error: " + err);
+                console.error("[CustomSitesStore] remove site error:", err);
             }
         },
 
         async toggleSite(id) {
-            console.log("toggling site: " + id);
+            console.log("[CustomSitesStore] toggling site:", id);
             try {
-                for (var i = 0; i < this.sites.length; i++) {
-                    if (this.sites[i] && this.sites[i].id === id) {
-                        this.sites[i].enabled = !this.sites[i].enabled;
-                        this.sites[i].updatedAt = Date.now();
-                        console.log("site toggled to: " + this.sites[i].enabled);
-                        break;
-                    }
+                const site = this.sites.find(s => s && s.id === id);
+                if (site) {
+                    site.enabled = !site.enabled;
+                    site.updatedAt = Date.now();
+                    await this.saveSites();
+                    console.log("[CustomSitesStore] site toggled to:", site.enabled);
                 }
-                await this.saveSites();
             } catch (err) {
-                console.log("toggle site error: " + err);
+                console.error("[CustomSitesStore] toggle site error:", err);
             }
         },
 
         setEditingSite(site) {
-            console.log("setting editing site");
-            if (site) {
-                // simple clone
-                var serialized = JSON.stringify(site);
-                this.editingSite = JSON.parse(serialized);
-            } else {
-                this.editingSite = null;
-            }
+            console.log("[CustomSitesStore] setting editing site");
+            this.editingSite = site ? JSON.parse(JSON.stringify(site)) : null;
         },
 
         exportSites() {
-            console.log("exporting custom sites");
+            console.log("[CustomSitesStore] exporting custom sites");
             return JSON.stringify(this.sites, null, 2);
         },
 
         async importSites(jsonString) {
-            console.log("importing custom sites from json");
+            console.log("[CustomSitesStore] importing custom sites from json");
             try {
-                var imported = JSON.parse(jsonString);
+                const imported = JSON.parse(jsonString);
                 if (!Array.isArray(imported)) {
-                    console.log("invalid import format");
+                    console.log("[CustomSitesStore] invalid import format");
                     return 0;
                 }
 
-                var count = 0;
-                for (var i = 0; i < imported.length; i++) {
-                    var site = imported[i];
-                    
-                    // check if hostname already exists
-                    var exists = false;
-                    for (var j = 0; j < this.sites.length; j++) {
-                        if (this.sites[j] && this.sites[j].hostname === site.hostname) {
-                            exists = true;
-                            break;
-                        }
+                let count = 0;
+                imported.forEach(site => {
+                    if (site && !this.sites.some(s => s && s.hostname === site.hostname)) {
+                        site.id = crypto.randomUUID();
+                        site.createdAt = Date.now();
+                        site.updatedAt = Date.now();
+                        this.sites.push(site);
+                        count++;
+                    } else {
+                        console.log("[CustomSitesStore] site hostname already exists or invalid:", site?.hostname);
                     }
-                    
-                    if (exists == true) {
-                        console.log("site hostname already exists: " + site.hostname);
-                        continue;
-                    }
-                    
-                    site.id = crypto.randomUUID();
-                    site.createdAt = Date.now();
-                    site.updatedAt = Date.now();
-                    this.sites.push(site);
-                    count++;
-                }
+                });
 
                 await this.saveSites();
-                console.log("imported count: " + count);
+                console.log("[CustomSitesStore] imported count:", count);
                 return count;
             } catch (err) {
-                console.log("import sites error: " + err);
+                console.error("[CustomSitesStore] import sites error:", err);
                 throw err;
             }
         }

@@ -27,7 +27,8 @@ function bootstrap() {
         DATA.CUSTOM_STATUSES,
         DATA.CUSTOM_SITES,
         TOGGLES.QUICK_ACTIONS,
-        TOGGLES.LIBRARY_SHOW_RIBBONS
+        TOGGLES.LIBRARY_SHOW_RIBBONS,
+        TOGGLES.READER_STATUS_PICKER
     ];
 
     // We use a callback here because it is simpler than Promises
@@ -102,7 +103,7 @@ function bootstrap() {
 
                     if (currentMode === 'reader') {
                         console.log('[BMH] Reader page active. Initializing progress tracker...');
-                        activeTracker = new ProgressTracker(adapter);
+                        activeTracker = new ProgressTracker(adapter, settings);
                         activeTracker.init();
                     } else {
                         console.log('[BMH] Gallery page active. Initializing card enhancer...');

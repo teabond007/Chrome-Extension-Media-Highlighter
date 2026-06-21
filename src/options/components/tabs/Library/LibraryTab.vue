@@ -164,169 +164,122 @@ const availableGenres = computed(() => {
 });
 
 const filteredEntries = computed(() => {
-    var result = [];
+    const searchLower = filters.search ? filters.search.toLowerCase().trim() : '';
+    const hasSearch = searchLower !== '';
+    const familyFriendly = familyFriendlyEnabled.value;
+    const filterStatus = filters.status !== 'All' ? filters.status.toLowerCase().trim().replace(/[-\s]/g, '') : '';
+    const hasStatus = filters.status !== 'All';
+    const hasFormat = filters.format !== 'All';
+    const hasGenre = filters.genre !== 'All';
+    const hasLastUpdated = filters.lastUpdated !== 'all';
     
-    for (var i = 0; i < savedEntries.value.length; i++) {
-        var entry = savedEntries.value[i];
-        var ani = entry.anilistData;
-        var keep = true;
+    return savedEntries.value.filter(entry => {
+        if (!entry) return false;
+        const ani = entry.anilistData;
         
         // Family Friendly
-        if (familyFriendlyEnabled.value == true && ani != null && Array.isArray(ani.genres)) {
-            for (var g = 0; g < ani.genres.length; g++) {
-                if (ani.genres[g] == 'Ecchi' || ani.genres[g] == 'Hentai') {
-                    keep = false;
-                }
-            }
+        if (familyFriendly && ani?.genres) {
+            if (ani.isAdult) return false;
+            if (ani.genres.some(g => g === 'Ecchi' || g === 'Hentai')) return false;
         }
         
         // Status
-        if (filters.status != "All") {
-            var entryStatus = "";
-            if (entry.status != null) {
-                entryStatus = entry.status.toLowerCase().trim().replace(/[-\s]/g, '');
-            }
-            var filterStatus = filters.status.toLowerCase().trim().replace(/[-\s]/g, '');
-
+        if (hasStatus) {
+            const entryStatus = (entry.status || '').toLowerCase().trim().replace(/[-\s]/g, '');
             if (filters.status.startsWith("marker:")) {
-                var statusName = filters.status.substring(7);
-                if (entry.customStatus != statusName && entry.status != statusName) {
-                    keep = false;
-                }
-            } else if (filters.status == "HasHistory") {
-                if (entry.lastRead == null && entry.lastChapterRead == null && (entry.readChapters == null || entry.readChapters <= 0)) {
-                    keep = false;
-                }
+                const statusName = filters.status.substring(7);
+                if (entry.customStatus !== statusName && entry.status !== statusName) return false;
+            } else if (filters.status === "HasHistory") {
+                if (!entry.lastRead && !entry.lastChapterRead && (!entry.readChapters || entry.readChapters <= 0)) return false;
             } else {
-                if (entryStatus != filterStatus) {
-                    keep = false;
-                }
+                if (entryStatus !== filterStatus) return false;
             }
         }
         
         // Format
-        if (filters.format != "All") {
-            if (ani == null) {
-                keep = false;
-            } else {
-                var formatName = getFormatName(ani.format, ani.countryOfOrigin);
-                if (formatName != filters.format) {
-                    keep = false;
-                }
-            }
+        if (hasFormat) {
+            if (!ani || getFormatName(ani.format, ani.countryOfOrigin) !== filters.format) return false;
         }
         
         // Genre
-        if (filters.genre != "All") {
-            if (ani == null || ani.genres == null) {
-                keep = false;
-            } else {
-                var hasGenre = false;
-                for (var g2 = 0; g2 < ani.genres.length; g2++) {
-                    if (ani.genres[g2] == filters.genre) hasGenre = true;
-                }
-                if (hasGenre == false) keep = false;
-            }
+        if (hasGenre) {
+            if (!ani?.genres || !ani.genres.includes(filters.genre)) return false;
         }
         
         // Search
-        if (filters.search != "") {
-            var titleMatch = LibraryService.fuzzyMatch(filters.search, entry.title);
+        if (hasSearch) {
+            const titleMatch = (entry.title && entry.title.toLowerCase().includes(searchLower)) ||
+                (ani?.title?.english && ani.title.english.toLowerCase().includes(searchLower)) ||
+                (ani?.title?.romaji && ani.title.romaji.toLowerCase().includes(searchLower));
             
-            if (ani != null && ani.title != null) {
-                if (ani.title.english != null && LibraryService.fuzzyMatch(filters.search, ani.title.english)) titleMatch = true;
-                if (ani.title.romaji != null && LibraryService.fuzzyMatch(filters.search, ani.title.romaji)) titleMatch = true;
-            }
+            const authorMatch = ani?.staff?.edges && ani.staff.edges.some(e => 
+                e?.node?.name?.full && e.node.name.full.toLowerCase().includes(searchLower)
+            );
             
-            var authorMatch = false;
-            if (ani != null && ani.staff != null && ani.staff.edges != null) {
-                for (var s = 0; s < ani.staff.edges.length; s++) {
-                    var edge = ani.staff.edges[s];
-                    if (edge != null && edge.node != null && edge.node.name != null) {
-                        if (edge.node.name.full != null) {
-                            if (LibraryService.fuzzyMatch(filters.search, edge.node.name.full)) {
-                                authorMatch = true;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (titleMatch == false && authorMatch == false) {
-                keep = false;
-            }
+            if (!titleMatch && !authorMatch) return false;
         }
         
-
-        
         // Chapter Range
-        var chapterMin = 0;
-        if (filters.chapterMin != null) chapterMin = filters.chapterMin;
-        
-        var chapterMax = 999999;
-        if (filters.chapterMax != null) chapterMax = filters.chapterMax;
-        
+        const chapterMin = filters.chapterMin || 0;
+        const chapterMax = filters.chapterMax || 999999;
         if (chapterMin > 0 || chapterMax < 999999) {
-            var totalChapters = 0;
-            if (ani != null && ani.chapters != null) {
-                totalChapters = ani.chapters;
-            } else if (entry.readChapters != null) {
-                totalChapters = entry.readChapters;
-            }
-            
-            if (totalChapters < chapterMin || totalChapters > chapterMax) {
-                keep = false;
-            }
+            const totalChapters = ani?.chapters || entry.readChapters || 0;
+            if (totalChapters < chapterMin || totalChapters > chapterMax) return false;
         }
         
         // Last Updated
-        if (filters.lastUpdated != "all") {
-            var now = Date.now();
-            var lastRead = 0;
-            if (entry.lastRead != null) lastRead = entry.lastRead;
-            else if (entry.lastUpdated != null) lastRead = entry.lastUpdated;
+        if (hasLastUpdated) {
+            const now = Date.now();
+            const lastRead = entry.lastRead || entry.lastUpdated || 0;
+            let cutoff = 0;
+            if (filters.lastUpdated === "7d") cutoff = now - (7 * 24 * 60 * 60 * 1000);
+            else if (filters.lastUpdated === "30d") cutoff = now - (30 * 24 * 60 * 60 * 1000);
+            else if (filters.lastUpdated === "90d") cutoff = now - (90 * 24 * 60 * 60 * 1000);
+            else if (filters.lastUpdated === "year") cutoff = now - (365 * 24 * 60 * 60 * 1000);
             
-            var cutoff = 0;
-            if (filters.lastUpdated == "7d") cutoff = now - (7 * 24 * 60 * 60 * 1000);
-            else if (filters.lastUpdated == "30d") cutoff = now - (30 * 24 * 60 * 60 * 1000);
-            else if (filters.lastUpdated == "90d") cutoff = now - (90 * 24 * 60 * 60 * 1000);
-            else if (filters.lastUpdated == "year") cutoff = now - (365 * 24 * 60 * 60 * 1000);
-            
-            if (lastRead < cutoff) keep = false;
+            if (lastRead < cutoff) return false;
         }
         
-        if (keep == true) {
-            result.push(entry);
-        }
-    }
-    
-    return result;
+        return true;
+    });
 });
 
 const sortedEntries = computed(() => {
     const list = [...filteredEntries.value];
+    if (list.length === 0) return list;
+
+    const sortType = filters.sort;
+
+    // Schwartzian transform to avoid key calculations in comparison loops
+    let mapped;
+    if (sortType === 'title-asc' || sortType === 'title-desc') {
+        mapped = list.map((entry, idx) => ({
+            idx,
+            val: (entry.anilistData?.title?.english || entry.title).toLowerCase()
+        }));
+        mapped.sort((a, b) => {
+            return sortType === 'title-asc' ? a.val.localeCompare(b.val) : b.val.localeCompare(a.val);
+        });
+        return mapped.map(item => list[item.idx]);
+    } else if (sortType === 'rating-desc' || sortType === 'rating-asc') {
+        mapped = list.map((entry, idx) => {
+            const id = LibraryService.getMangaId(entry);
+            const val = personalData.value[id]?.rating || 0;
+            return { idx, val };
+        });
+        mapped.sort((a, b) => {
+            return sortType === 'rating-desc' ? b.val - a.val : a.val - b.val;
+        });
+        return mapped.map(item => list[item.idx]);
+    }
+
     list.sort((a, b) => {
-        const titleA = (a.anilistData?.title?.english || a.title).toLowerCase();
-        const titleB = (b.anilistData?.title?.english || b.title).toLowerCase();
-        
-        switch (filters.sort) {
-            case 'title-asc': return titleA.localeCompare(titleB);
-            case 'title-desc': return titleB.localeCompare(titleA);
+        switch (sortType) {
             case 'pop-desc': return (b.anilistData?.popularity || 0) - (a.anilistData?.popularity || 0);
             case 'pop-asc': return (a.anilistData?.popularity || 0) - (b.anilistData?.popularity || 0);
             case 'score-desc': return (b.anilistData?.averageScore || 0) - (a.anilistData?.averageScore || 0);
             case 'added-desc': return (b.lastUpdated || 0) - (a.lastUpdated || 0);
             case 'last-read-desc': return (b.lastRead || 0) - (a.lastRead || 0);
-             case 'rating-desc': {
-                const rA = personalData.value[LibraryService.getMangaId(a)]?.rating || 0;
-                const rB = personalData.value[LibraryService.getMangaId(b)]?.rating || 0;
-                return rB - rA;
-            }
-            case 'rating-asc': {
-                const rA = personalData.value[LibraryService.getMangaId(a)]?.rating || 0;
-                const rB = personalData.value[LibraryService.getMangaId(b)]?.rating || 0;
-                return rA - rB;
-            }
             default: return 0;
         }
     });

@@ -181,8 +181,13 @@ const setupScrollTopListener = () => {
     const container = document.querySelector(".main-content");
     if (!container) return;
 
+    let lastState = false;
     container.addEventListener("scroll", () => {
-        showScrollTop.value = container.scrollTop > 300;
+        const newState = container.scrollTop > 300;
+        if (newState !== lastState) {
+            showScrollTop.value = newState;
+            lastState = newState;
+        }
     });
 
     const btn = document.getElementById("scrollToTopBtn");

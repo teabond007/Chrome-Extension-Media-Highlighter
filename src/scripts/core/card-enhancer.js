@@ -19,33 +19,24 @@ export class CardEnhancer {
      * @param {Object} adapter - Platform-specific adapter
      * @param {Object} settings - User settings from Chrome storage
      */
-    constructor(adapter, settings) {
+    constructor(adapter, settings = {}) {
         console.log("[CardEnhancer] constructor called!");
-        if (settings == null) settings = {};
         this.adapter = adapter;
 
-        var borderSize = settings[SETTINGS.HIGHLIGHT_THICKNESS];
-        if (borderSize == undefined) borderSize = 4;
-
+        const borderSize = settings[SETTINGS.HIGHLIGHT_THICKNESS] ?? 4;
         this.settings = {
             border: {
                 size: borderSize,
                 style: settings[SETTINGS.BORDER_STYLE] || 'solid',
                 radius: '8px'
-            }
+            },
+            highlighting: settings[TOGGLES.LIBRARY_BORDERS] !== false,
+            quickActions: settings[TOGGLES.QUICK_ACTIONS] !== false,
+            showRibbons: settings[TOGGLES.LIBRARY_SHOW_RIBBONS] !== false,
+            customStatuses: Array.isArray(settings[DATA.CUSTOM_STATUSES]) ? settings[DATA.CUSTOM_STATUSES] : [],
+            customStatusesEnabled: settings[TOGGLES.CUSTOM_STATUS_ENABLED] !== false
         };
-
-        this.settings.highlighting = settings[TOGGLES.LIBRARY_BORDERS] !== false;
-        this.settings.quickActions = settings[TOGGLES.QUICK_ACTIONS] !== false;
-        this.settings.showRibbons = settings[TOGGLES.LIBRARY_SHOW_RIBBONS] !== false;
-        
-        var customStatuses = settings[DATA.CUSTOM_STATUSES];
-        if (Array.isArray(customStatuses) == false) {
-            customStatuses = [];
-        }
-        this.settings.customStatuses = customStatuses;
-        this.settings.customStatusesEnabled = settings[TOGGLES.CUSTOM_STATUS_ENABLED] !== false;
-        console.log("[CardEnhancer] constructor finished setting up settings!");
+        console.log("[CardEnhancer] constructor finished setup!");
     }
 
     /**
@@ -53,61 +44,52 @@ export class CardEnhancer {
      * @returns {Promise<number>} Number of cards enhanced
      */
     async enhanceAll() {
-        console.log("[CardEnhancer] Starting the enhanceAll function now!");
-        if (!chrome.runtime?.id) {
-            return 0;
-        }
+        console.log("[CardEnhancer] Starting enhanceAll");
+        if (!chrome.runtime?.id) return 0;
 
         try {
+            const cards = this.findCards();
+            console.log(`[CardEnhancer] Found ${cards.length} cards on this page.`);
             
-            var cards = this.findCards();
-            console.log("[CardEnhancer] We found " + cards.length + " cards on this page.");
-            
-       
-            var storageData = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES, DATA.READING_HISTORY]);
-            
-            var library = [];
-            if (Array.isArray(storageData[DATA.LIBRARY_ENTRIES])) {
-                library = storageData[DATA.LIBRARY_ENTRIES];
-            }
-            
+            const storageData = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES, DATA.READING_HISTORY]);
+            const library = Array.isArray(storageData[DATA.LIBRARY_ENTRIES]) ? storageData[DATA.LIBRARY_ENTRIES] : [];
+            const readChapters = storageData[DATA.READING_HISTORY] || {};
 
-            var readChapters = storageData[DATA.READING_HISTORY] || {};
+            // Pre-build index Map of reading history keys for O(1) matching
+            const historyKeysMap = new Map();
+            Object.keys(readChapters).forEach(key => {
+                historyKeysMap.set(this.normalizeTitle(key), key);
+            });
 
             // Attach read chapter data to each library entry
-            for (var k = 0; k < library.length; k++) {
-                var entry = library[k];
-                if (entry && entry.title) {
-                    var historyKey = this.findHistoryKey(entry.title, entry.slug, readChapters);
-                    var chaptersForEntry = [];
-                    if (historyKey) {
-                        chaptersForEntry = readChapters[historyKey] || [];
-                    }
+            library.forEach(entry => {
+                if (entry?.title) {
+                    const historyKey = this.findHistoryKey(entry.title, entry.slug, readChapters, historyKeysMap);
+                    const chaptersForEntry = historyKey ? (readChapters[historyKey] || []) : [];
                     entry.readChapters = chaptersForEntry;
                     entry.lastReadChapter = this.getHighestChapter(chaptersForEntry);
                 }
-            }
+            });
 
-            var enhancedCount = 0;
+            // Pre-build index Map of library entries for O(1) matching
+            const libraryMap = new Map();
+            library.forEach(entry => {
+                if (entry?.title) {
+                    libraryMap.set(this.normalizeTitle(entry.title), entry);
+                }
+            });
 
-            // Loop through each card and try to find a match in the library
-            for (var i = 0; i < cards.length; i++) {
-                var card = cards[i];
+            let enhancedCount = 0;
 
+            cards.forEach(card => {
                 try {
-                    if (card.element.dataset.bmhEnhanced) {
-                        continue;
-                    }
+                    if (card.element.dataset.bmhEnhanced) return;
 
-                    
-                    var match = this.findMatch(card, library);
-
+                    const match = this.findMatch(card, libraryMap);
                     if (match) {
-                       
                         this.applyEnhancements(card, match);
                     } else if (this.settings.quickActions) {
-                       
-                        var skeletonEntry = {
+                        const skeletonEntry = {
                             title: card.data.title,
                             slug: card.data.id,
                             status: 'Add to Library',
@@ -120,16 +102,16 @@ export class CardEnhancer {
                     }
 
                     card.element.dataset.bmhEnhanced = 'true';
-                    enhancedCount = enhancedCount + 1;
+                    enhancedCount++;
                 } catch (cardError) {
-                    console.log('[CardEnhancer]error aaa: ' + cardError);
+                    console.error('[CardEnhancer] Card enhancement error:', cardError);
                 }
-            }
+            });
 
-            console.log("[CardEnhancer] Done enhancing cards! Total enhanced in this run: " + enhancedCount);
+            console.log(`[CardEnhancer] Finished enhancing cards. Total: ${enhancedCount}`);
             return enhancedCount;
         } catch (err) {
-            console.log('[CardEnhancer] error: ' + err);
+            console.error('[CardEnhancer] Error in enhanceAll:', err);
             return 0;
         }
     }
@@ -139,127 +121,82 @@ export class CardEnhancer {
      * @returns {Array<{ element: HTMLElement, data: Object }>}
      */
     findCards() {
-        var selector = this.adapter.selectors.card;
+        const selector = this.adapter.selectors?.card;
         if (!selector) return [];
 
-        var elements = document.querySelectorAll(selector);
-        var cards = [];
-
-        for (var i = 0; i < elements.length; i++) {
-            var el = elements[i];
-            var data = this.adapter.extractCardData(el);
-
-            // Only include cards that have at least a title or id
-            if (data.title || data.id) {
-                cards.push({ element: el, data: data });
-            }
-        }
-
-        return cards;
+        const elements = document.querySelectorAll(selector);
+        return Array.from(elements)
+            .map(element => ({ element, data: this.adapter.extractCardData(element) }))
+            .filter(card => card.data.title || card.data.id);
     }
-
-    /**
-     * Load library entries and reading history from Chrome storage.
-     * Attaches read chapter data to each entry before returning.
-     * @returns {Promise<Array>}
-     */
-    // We don't need a separate loadLibrary function anymore as it is simpler to just call it in enhanceAll
 
     /**
      * Find the reading history key for an entry by trying slug, prefix, and title.
      * @param {string} title - Entry title
      * @param {string|undefined} slug - Entry slug
      * @param {Object} readChapters - Reading history map
+     * @param {Map} [historyKeysMap] - Optional map of normalized history keys to raw keys
      * @returns {string|null}
      */
-    findHistoryKey(title, slug, readChapters) {
+    findHistoryKey(title, slug, readChapters, historyKeysMap) {
         if (!readChapters) return null;
 
         if (slug) {
-            // Try slug prefixed with adapter namespace
-            var namespacedKey = (this.adapter.PREFIX || '') + slug;
+            const namespacedKey = (this.adapter.PREFIX || '') + slug;
             if (readChapters[namespacedKey]) return namespacedKey;
-
-            // Try bare slug
             if (readChapters[slug]) return slug;
 
-            // Try slug without trailing ID (e.g. "slug.123" → "slug")
             if (slug.includes('.')) {
-                var baseSlug = slug.substring(0, slug.lastIndexOf('.'));
+                const baseSlug = slug.substring(0, slug.lastIndexOf('.'));
                 if (readChapters[baseSlug]) return baseSlug;
             }
         }
 
-        // Try direct title match
         if (readChapters[title]) return title;
 
-        // Try normalized title match against all keys
-        var normalized = this.normalizeTitle(title);
-        var keys = Object.keys(readChapters);
-        for (var i = 0; i < keys.length; i++) {
-            if (this.normalizeTitle(keys[i]) === normalized) {
-                return keys[i];
-            }
+        const normalized = this.normalizeTitle(title);
+        if (historyKeysMap) {
+            return historyKeysMap.get(normalized) || null;
         }
 
-        return null;
+        const matchKey = Object.keys(readChapters).find(key => this.normalizeTitle(key) === normalized);
+        return matchKey || null;
     }
 
     /**
-     * if title both in library and on card, return object.
+     * Finds a matching entry in the library for a card.
      * @param {{ element: HTMLElement, data: Object }} card
-     * @param {Array} library
+     * @param {Map} libraryMap
      * @returns {Object|undefined}
      */
-    findMatch(card, library) {
-      
+    findMatch(card, libraryMap) {
         try {
-            var normalizedCardTitle = this.normalizeTitle(card.data.title);
-           
-            
-            // Loop through all entries to see if we find a title that matches
-            for (var i = 0; i < library.length; i++) {
-                var entry = library[i];
-                var entryTitle = entry.title;
-                var normalizedEntryTitle = this.normalizeTitle(entryTitle);
-                
-                if (normalizedEntryTitle === normalizedCardTitle) {
-                
-                    return entry;
-                }
-            }
-            
+            const normalizedCardTitle = this.normalizeTitle(card.data.title);
+            return libraryMap.get(normalizedCardTitle);
         } catch (e) {
-            console.log("[CardEnhancer] error in findMatch: " + e);
+            console.error("[CardEnhancer] error in findMatch:", e);
         }
         return undefined;
     }
 
     /**
      * Apply all enabled enhancements to a matched card.
-     * applyRibbon, applyQuickActions, applyBorder
      * @param {{ element: HTMLElement, data: Object }} card
      * @param {Object} entry - Library entry
      */
     applyEnhancements(card, entry) {
-       
         try {
             if (this.settings.highlighting) {
-               
                 this.applyBorder(card, entry);
             }
-
             if (this.settings.quickActions) {
-              
                 this.applyQuickActions(card, entry);
             }
-
             if (this.settings.showRibbons) {
-               
                 this.applyRibbon(card, entry);
             }
         } catch (err) {
-            console.log("[CardEnhancer] Error applying enhancements: " + err);
+            console.error("[CardEnhancer] Error applying enhancements:", err);
         }
     }
 
@@ -270,28 +207,25 @@ export class CardEnhancer {
      * @returns {{ color: string, style: string }}
      */
     resolveStatusColor(status) {
-        var color = '';
-        var style = this.settings.border.style;
-
-        // Check built-in status colors
-        var colorKeys = Object.keys(STATUS_COLORS);
-        for (var i = 0; i < colorKeys.length; i++) {
-            var key = colorKeys[i];
-            if (status === key.toLowerCase() || status.includes(key.toLowerCase())) {
-                color = STATUS_COLORS[key];
-                break;
-            }
-        }
+        let color = '';
+        let style = this.settings.border.style;
+        const normalized = status.toLowerCase();
 
         // Custom status overrides (highest priority)
         if (this.settings.customStatusesEnabled && this.settings.customStatuses) {
-            for (var i = 0; i < this.settings.customStatuses.length; i++) {
-                var custom = this.settings.customStatuses[i];
-                if (custom.name && status.includes(custom.name.toLowerCase())) {
-                    color = custom.color;
-                    style = custom.style || 'solid';
-                }
+            const custom = this.settings.customStatuses.find(c => c.name && normalized.includes(c.name.toLowerCase()));
+            if (custom) {
+                return {
+                    color: custom.color,
+                    style: custom.style || 'solid'
+                };
             }
+        }
+
+        // Check built-in status colors
+        const matchKey = Object.keys(STATUS_COLORS).find(key => normalized === key.toLowerCase() || normalized.includes(key.toLowerCase()));
+        if (matchKey) {
+            color = STATUS_COLORS[matchKey];
         }
 
         return { color, style };
@@ -303,23 +237,19 @@ export class CardEnhancer {
      * @param {Object} entry - Library entry
      */
     applyBorder(card, entry) {
-        var status = (entry.status || '').trim().toLowerCase();
+        const status = (entry.status || '').trim().toLowerCase();
         if (!status || status === 'add to library') return;
 
-        var { color, style } = this.resolveStatusColor(status);
+        const { color, style } = this.resolveStatusColor(status);
         if (!color) return;
 
-        // Use adapter's custom border method if provided
         if (this.adapter.applyBorder) {
             this.adapter.applyBorder(card.element, color, this.settings.border.size, style);
             return;
         }
 
-        // Default: apply directly to the card's li wrapper (or the card itself)
-        var target = card.element.closest('li') || card.element;
-
-        // Ensure target is at least inline-block so border wraps content correctly
-        var display = window.getComputedStyle(target).display;
+        const target = card.element.closest('li') || card.element;
+        const display = window.getComputedStyle(target).display;
         if (display === 'inline') {
             target.style.setProperty('display', 'inline-block', 'important');
         }
@@ -328,11 +258,8 @@ export class CardEnhancer {
         target.style.setProperty('box-shadow', 'none', 'important');
         target.style.setProperty('border-radius', this.settings.border.radius, 'important');
         target.style.setProperty('box-sizing', 'border-box', 'important');
-        
-        // Ensure content is visible and wraps correctly
         target.style.setProperty('overflow', 'visible', 'important');
         
-        // If target has no height (collapsed), force a minimum height based on font size or content
         if (target.offsetHeight === 0) {
             target.style.setProperty('min-height', '20px', 'important');
             target.style.setProperty('display', 'inline-block', 'important');
@@ -347,21 +274,12 @@ export class CardEnhancer {
     applyRibbon(card, entry) {
         if (!entry.status || entry.status === 'Add to Library') return;
 
-        var status = (entry.status || '').trim().toLowerCase();
-        var { color } = this.resolveStatusColor(status);
-
-        // Fall back to a default accent color if none found
-        var finalColor = color || '#6366f1';
+        const status = (entry.status || '').trim().toLowerCase();
+        const { color } = this.resolveStatusColor(status);
+        const finalColor = color || '#6366f1';
 
         OverlayFactory.mountStatusRibbon(card.element, entry.status, finalColor);
     }
-
-
-    /**
-     * Apply a "NEW" badge for cards with unread chapters.
-     * @param {{ element: HTMLElement, data: Object }} card
-     */
-    // applyNewBadge has been removed because it is never an option in the program.
 
     /**
      * Apply the quick-actions tooltip overlay to a card.
@@ -369,7 +287,7 @@ export class CardEnhancer {
      * @param {Object} entry - Library entry
      */
     applyQuickActions(card, entry) {
-        var callbacks = {
+        const callbacks = {
             continue: (e) => this.handleContinueReading(e, card),
             status: (e, target) => this.handleStatusChange(e, target || null, card),
             details: (e) => this.handleViewDetails(e, card)
@@ -377,8 +295,7 @@ export class CardEnhancer {
 
         OverlayFactory.mountQuickActions(card.element, entry, this.adapter, callbacks);
         
-        // Ensure element can host absolute children
-        var display = window.getComputedStyle(card.element).display;
+        const display = window.getComputedStyle(card.element).display;
         if (display === 'inline') {
             card.element.style.setProperty('display', 'inline-block', 'important');
         }
@@ -388,42 +305,34 @@ export class CardEnhancer {
 
     /**
      * Handle "Continue Reading" — navigates to the next chapter URL.
-     * Tries adapter URL builder, then smart URL increment, then fallbacks.
      * @param {Object} entry - Library entry
      * @param {{ element: HTMLElement, data: Object }} card
      */
     handleContinueReading(entry, card) {
-        var nextChapter = OverlayFactory.calculateNextChapter(entry);
+        const nextChapter = OverlayFactory.calculateNextChapter(entry);
+        let url = null;
 
-        // 1. Try adapter's own chapter URL builder
-        var url = null;
         if (this.adapter.buildChapterUrl) {
             url = this.adapter.buildChapterUrl(entry, nextChapter);
         }
 
-        // 2. If adapter didn't provide a URL, try to increment the last known reader URL
         if (url == null && entry[LIBRARY_ENTRY_KEYS.LAST_READER_URL]) {
-            var lastUrl = entry[LIBRARY_ENTRY_KEYS.LAST_READER_URL];
-            var lastChapter = parseFloat(entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER]) || 0;
+            const lastUrl = entry[LIBRARY_ENTRY_KEYS.LAST_READER_URL];
+            const lastChapter = parseFloat(entry[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER]) || 0;
 
-            // Use simple string replacement to increment the chapter in the URL
-            var searchStr1 = "/" + lastChapter;
-            var searchStr2 = "-" + lastChapter;
+            const searchStr1 = `/${lastChapter}`;
+            const searchStr2 = `-${lastChapter}`;
 
-            if (lastUrl.indexOf(searchStr1) != -1) {
-                url = lastUrl.replace(searchStr1, "/" + nextChapter);
-               
-            } else if (lastUrl.indexOf(searchStr2) != -1) {
-                url = lastUrl.replace(searchStr2, "-" + nextChapter);
-         
+            if (lastUrl.includes(searchStr1)) {
+                url = lastUrl.replace(searchStr1, `/${nextChapter}`);
+            } else if (lastUrl.includes(searchStr2)) {
+                url = lastUrl.replace(searchStr2, `-${nextChapter}`);
             } else {
-                // Can't find the chapter in URL — just go back to the last read page
                 url = lastUrl;
                 console.log('[CardEnhancer] Could not find chapter in URL, using last read URL');
             }
         }
 
-        // 3. Navigate, with progressively weaker fallbacks
         if (url) {
             window.location.href = url;
         } else if (entry.sourceUrl) {
@@ -431,14 +340,14 @@ export class CardEnhancer {
         } else if (card.data.url) {
             window.location.href = card.data.url;
         } else {
-            console.log('[CardEnhancer] No URL available for continue reading:', entry);
+            console.warn('[CardEnhancer] No URL available for continue reading:', entry);
         }
     }
 
     /**
      * Handle status change — opens the status picker popup.
      * @param {Object} entry - Library entry
-     * @param {HTMLElement} btn - Button element that was clicked
+     * @param {HTMLElement} btn - Button element clicked
      * @param {{ element: HTMLElement, data: Object }} card
      */
     handleStatusChange(entry, btn, card) {
@@ -446,13 +355,12 @@ export class CardEnhancer {
             btn,
             entry,
             this.settings.customStatuses,
-            (newStatus, entry) => this.saveStatusChange(entry, newStatus)
+            (newStatus, ent) => this.saveStatusChange(ent, newStatus)
         );
     }
 
     /**
-     * Handle view details — sends a message to open the options page detail modal.
-     * Adapter can override this behaviour.
+     * Handle view details.
      * @param {Object} entry - Library entry
      * @param {{ element: HTMLElement, data: Object }} card
      */
@@ -464,45 +372,32 @@ export class CardEnhancer {
 
         chrome.runtime.sendMessage({ type: 'showMangaDetails', title: entry.title }, () => {
             if (chrome.runtime.lastError) {
-                console.log('[CardEnhancer] Error opening details:', chrome.runtime.lastError);
+                console.error('[CardEnhancer] Error opening details:', chrome.runtime.lastError);
             }
         });
     }
 
     /**
      * Save a new status for an entry to Chrome storage.
-     * Creates a new library entry if the manga is not already saved.
      * @param {Object} entry - Library entry
      * @param {string} newStatus - New status string
      */
     async saveStatusChange(entry, newStatus) {
         try {
-            var data = await new Promise(resolve => {
-                chrome.storage.local.get([DATA.LIBRARY_ENTRIES], resolve);
-            });
+            const data = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES]);
+            const entries = data[DATA.LIBRARY_ENTRIES] || [];
 
-            var entries = data[DATA.LIBRARY_ENTRIES] || [];
-
-            // Find existing entry by normalized title
-            var foundIdx = -1;
-            for (var i = 0; i < entries.length; i++) {
-                if (this.normalizeTitle(entries[i].title) === this.normalizeTitle(entry.title)) {
-                    foundIdx = i;
-                    break;
-                }
-            }
+            const normalizedTitle = this.normalizeTitle(entry.title);
+            const foundIdx = entries.findIndex(e => e && this.normalizeTitle(e.title) === normalizedTitle);
 
             if (foundIdx !== -1) {
-                // Entry already exists — just update its status in place
                 entries[foundIdx].status = newStatus;
                 entries[foundIdx].lastUpdated = Date.now();
                 if (this.adapter.type) {
                     entries[foundIdx].type = this.adapter.type;
                 }
-             
             } else {
-                // Entry is new — build it and try to fetch metadata before saving
-                var newEntry = {
+                const newEntry = {
                     title: entry.title,
                     slug: entry.slug,
                     status: newStatus,
@@ -514,38 +409,27 @@ export class CardEnhancer {
                 };
 
                 try {
-                    var metadata = await getMergedMetadata(entry.title, newEntry.type);
+                    const metadata = await getMergedMetadata(entry.title, newEntry.type);
                     if (metadata) {
                         newEntry.anilistData = metadata;
                     }
                 } catch (e) {
-                    console.warn('[CardEnhancer] error:', e);
+                    console.warn('[CardEnhancer] Metadata fetch error:', e);
                 }
 
                 entries.push(newEntry);
                 console.log('[CardEnhancer] Added new entry to library: ' + entry.title);
             }
 
-            // Sanitize before saving — strips Vue proxies and ensures plain array
-            var finalEntries = Array.isArray(entries) ? entries : [];
-            await new Promise(resolve => {
-                chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(finalEntries)) }, resolve);
-            });
-
-            console.log('[CardEnhancer] Status saved: ' + entry.title + ' → ' + newStatus);
+            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(entries)) });
+            console.log(`[CardEnhancer] Status saved: ${entry.title} -> ${newStatus}`);
 
             // Re-run enhancements after a short delay so storage can settle
             setTimeout(() => {
-                var enhanced = document.querySelectorAll('[data-bmh-enhanced]');
-                for (var i = 0; i < enhanced.length; i++) {
-                    var el = enhanced[i];
+                document.querySelectorAll('[data-bmh-enhanced]').forEach(el => {
                     el.removeAttribute('data-bmh-enhanced');
-
-                    var overlays = el.querySelectorAll('.bmh-vue-container, .bmh-vue-badge-container');
-                    for (var j = 0; j < overlays.length; j++) {
-                        overlays[j].remove();
-                    }
-                }
+                    el.querySelectorAll('.bmh-vue-container, .bmh-vue-badge-container').forEach(child => child.remove());
+                });
                 this.enhanceAll();
             }, 100);
         } catch (e) {
@@ -571,16 +455,16 @@ export class CardEnhancer {
     getHighestChapter(chapters) {
         if (!chapters || chapters.length === 0) return 0;
 
-        var highest = 0;
-        for (var i = 0; i < chapters.length; i++) {
-            var match = String(chapters[i]).match(/^(\d+\.?\d*)/);
+        let highest = 0;
+        chapters.forEach(ch => {
+            const match = String(ch).match(/^(\d+\.?\d*)/);
             if (match) {
-                var num = parseFloat(match[1]);
+                const num = parseFloat(match[1]);
                 if (num > highest) {
                     highest = num;
                 }
             }
-        }
+        });
 
         return highest;
     }

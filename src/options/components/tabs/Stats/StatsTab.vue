@@ -330,15 +330,23 @@ const getRatingBarHeight = (count) => {
  * @returns {string}
  */
 const getStatusColor = (status) => {
+    if (!status) return 'var(--accent-secondary)';
+    
+    // Check custom statuses first
+    const custom = (settingsStore.customStatuses || []).find(c => c.name.toLowerCase() === status.toLowerCase());
+    if (custom) return custom.color;
+
     switch (status) {
         case 'Reading':
-        case 'Watching': return '#4318FF'; // Theme primary accent
-        case 'Completed': return '#10b981'; // Success emerald
+        case 'Watching': return '#10b981'; // Emerald Green
+        case 'Completed': return '#3b82f6'; // Success Blue
         case 'Plan to Read':
-        case 'Plan to Watch': return '#a855f7'; // Purple
+        case 'Plan to Watch': return '#fbbf24'; // Amber Yellow
         case 'On Hold':
-        case 'On-Hold': return '#FFB547'; // Warning gold
-        case 'Dropped': return '#EE5D50'; // Danger red
+        case 'On-Hold': return '#f97316'; // Warning Orange
+        case 'Dropped': return '#ef4444'; // Danger Red
+        case 'Re-reading':
+        case 'Re-watching': return '#a855f7'; // Purple
         default: return 'var(--accent-secondary)';
     }
 };
@@ -390,25 +398,38 @@ const stats = computed(() => {
         statusCounts['On Hold'] = 0;
         statusCounts['Dropped'] = 0;
     }
+
+    // Initialize custom statuses in distribution map so they show up
+    if (Array.isArray(settingsStore.customStatuses)) {
+        settingsStore.customStatuses.forEach(c => {
+            statusCounts[c.name] = 0;
+        });
+    }
     
     for (var i = 0; i < list.length; i++) {
         const e = list[i];
         if (!e) continue;
         
-        let status = e.status;
+        let status = e.customStatus || e.status;
         if (!status) {
             status = e.type === 'anime' ? 'Plan to Watch' : 'Plan to Read';
         }
         
-        // Normalize status names for anime vs manga just in case they were saved weirdly
-        if (e.type === 'anime') {
-            if (status === 'Reading') status = 'Watching';
-            if (status === 'Plan to Read') status = 'Plan to Watch';
-            if (status === 'Re-reading') status = 'Re-watching';
-        } else {
-            if (status === 'Watching') status = 'Reading';
-            if (status === 'Plan to Watch') status = 'Plan to Read';
-            if (status === 'Re-watching') status = 'Re-reading';
+        // Only normalize if it is not a custom status
+        const isCustom = Array.isArray(settingsStore.customStatuses) && 
+            settingsStore.customStatuses.some(c => c.name.toLowerCase() === status.toLowerCase());
+
+        if (!isCustom) {
+            // Normalize status names for anime vs manga just in case they were saved weirdly
+            if (e.type === 'anime') {
+                if (status === 'Reading') status = 'Watching';
+                if (status === 'Plan to Read') status = 'Plan to Watch';
+                if (status === 'Re-reading') status = 'Re-watching';
+            } else {
+                if (status === 'Watching') status = 'Reading';
+                if (status === 'Plan to Watch') status = 'Plan to Read';
+                if (status === 'Re-watching') status = 'Re-reading';
+            }
         }
 
         if (statusCounts[status] === undefined) {
@@ -427,6 +448,25 @@ const stats = computed(() => {
     let totalChapters = 0;
     const mangaReadCounts = [];
     
+    // Pre-build Maps for O(1) matching in history and ratings processing
+    const entryByTitle = new Map();
+    const entryBySlug = new Map();
+    const entryByPersonalKey = new Map();
+
+    list.forEach(e => {
+        if (!e) return;
+        if (e.title) entryByTitle.set(e.title.toLowerCase(), e);
+        if (e.slug) entryBySlug.set(e.slug.toLowerCase(), e);
+        
+        const keys = [
+            e.title?.toLowerCase(),
+            e.slug?.toLowerCase(),
+            e.mangaSlug?.toLowerCase(),
+            e.anilistData?.id ? String(e.anilistData.id).toLowerCase() : null
+        ].filter(Boolean);
+        keys.forEach(k => entryByPersonalKey.set(k, e));
+    });
+
     const historyKeys = Object.keys(hist);
     for (var j = 0; j < historyKeys.length; j++) {
         const key = historyKeys[j];
@@ -434,12 +474,20 @@ const stats = computed(() => {
         if (Array.isArray(chapters)) {
             // Find corresponding title in library
             let title = key;
-            const entry = list.find(e => {
-                if (!e) return false;
-                const matchSlug = e.slug === key || (e.slug && key.includes(e.slug));
-                const matchTitle = e.title === key;
-                return matchSlug || matchTitle;
-            });
+            const keyLower = key.toLowerCase();
+            let entry = entryByTitle.get(keyLower) || entryBySlug.get(keyLower);
+            
+            // Substring fallback
+            if (!entry) {
+                if (keyLower.includes(':')) {
+                    const lastPart = keyLower.substring(keyLower.lastIndexOf(':') + 1);
+                    entry = entryBySlug.get(lastPart);
+                }
+                if (!entry) {
+                    entry = list.find(e => e && e.slug && keyLower.includes(e.slug.toLowerCase()));
+                }
+            }
+
             if (entry) {
                 title = entry.title;
                 totalChapters += chapters.length;
@@ -474,15 +522,7 @@ const stats = computed(() => {
     for (var k = 0; k < personalKeys.length; k++) {
         const key = personalKeys[k];
         // We only want to count ratings/notes for entries in our filtered list
-        const entry = list.find(e => {
-            if (!e) return false;
-            // Get ID or slug matching to match personal keys
-            const keyLower = key.toLowerCase();
-            const eTitleLower = e.title.toLowerCase();
-            const eSlugLower = (e.slug || '').toLowerCase();
-            const eMangaSlugLower = (e.mangaSlug || '').toLowerCase();
-            return keyLower === eTitleLower || keyLower === eSlugLower || keyLower === eMangaSlugLower || (e.anilistData && String(e.anilistData.id) === key);
-        });
+        const entry = entryByPersonalKey.get(key.toLowerCase());
 
         if (entry) {
             const pData = personal[key] || {};

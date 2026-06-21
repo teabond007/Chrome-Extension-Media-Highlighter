@@ -59,13 +59,9 @@ export class GenericAdapter {
     }
 
     get selectors() {
-        var cardSelectors = [];
-        for (var i = 0; i < this.selectorGroups.length; i++) {
-            var group = this.selectorGroups[i];
-            if (group && group.card) {
-                cardSelectors.push(group.card);
-            }
-        }
+        const cardSelectors = this.selectorGroups
+            .map(g => g?.card)
+            .filter(Boolean);
 
         return {
             card: cardSelectors.join(', '),
@@ -85,19 +81,14 @@ export class GenericAdapter {
         let url = '';
         let id = '';
 
-        // Find which selector group matches this card using a simple loop
-        var group = null;
-        for (var i = 0; i < this.selectorGroups.length; i++) {
-            var g = this.selectorGroups[i];
+        // Find which selector group matches this card
+        const group = this.selectorGroups.find(g => {
             try {
-                if (cardElement.matches(g.card)) {
-                    group = g;
-                    break;
-                }
+                return cardElement.matches(g.card);
             } catch (e) {
-                // Ignore invalid selectors
+                return false;
             }
-        }
+        });
 
         if (group && group.title) {
             try {
@@ -181,27 +172,20 @@ export class GenericAdapter {
             var path = urlObj.pathname;
             
             // Split the path by / and look at the parts
-            var parts = path.split("/");
+            const parts = path.split("/");
             
             // Try to find parts that usually come before the ID
-            for (var i = 0; i < parts.length; i++) {
-                var p = parts[i].toLowerCase();
-                if (p == "manga" || p == "series" || p == "title" || p == "comic" || p == "read") {
-                    if (parts[i + 1]) {
-                        return parts[i + 1];
-                    }
-                }
+            const triggerIdx = parts.findIndex(p => {
+                const lower = p.toLowerCase();
+                return lower === "manga" || lower === "series" || lower === "title" || lower === "comic" || lower === "read";
+            });
+
+            if (triggerIdx !== -1 && parts[triggerIdx + 1]) {
+                return parts[triggerIdx + 1];
             }
 
-            // Fallback: just use the last part of the URL
-            var lastPart = "";
-            for (var j = parts.length - 1; j >= 0; j--) {
-                if (parts[j] != "") {
-                    lastPart = parts[j];
-                    break;
-                }
-            }
-            return lastPart;
+            // Fallback: just use the last non-empty part of the URL
+            return parts.filter(Boolean).pop() || '';
 
         } catch (e) {
             return '';
