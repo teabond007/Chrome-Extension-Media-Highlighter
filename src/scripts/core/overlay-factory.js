@@ -104,6 +104,32 @@ export class OverlayFactory {
         container.style.top = `${rect.bottom + 8}px`;
         container.style.zIndex = '10000';
 
+        // Dynamically adjust picker position to prevent off-screen overflow
+        requestAnimationFrame(() => {
+            const pickerEl = shadow.querySelector('.bmh-status-picker');
+            if (pickerEl) {
+                const pickerHeight = pickerEl.offsetHeight;
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+
+                if (spaceBelow < pickerHeight + 12 && spaceAbove > pickerHeight + 12) {
+                    // Position above the button if there is more space above
+                    container.style.top = `${rect.top - pickerHeight - 8}px`;
+                } else if (spaceBelow < pickerHeight + 12) {
+                    // Constrain within the window bounds
+                    const adjustedTop = Math.max(8, window.innerHeight - pickerHeight - 12);
+                    container.style.top = `${adjustedTop}px`;
+                }
+
+                // Keep picker within horizontal bounds
+                const pickerWidth = pickerEl.offsetWidth;
+                const spaceRight = window.innerWidth - rect.left;
+                if (spaceRight < pickerWidth + 12) {
+                    container.style.left = `${Math.max(8, window.innerWidth - pickerWidth - 12)}px`;
+                }
+            }
+        });
+
         let outsideClickHandler;
         const cleanup = () => {
             app.unmount();

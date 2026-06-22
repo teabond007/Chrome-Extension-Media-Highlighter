@@ -50,6 +50,7 @@ let isReaderMode = false;
 
 /** Collected selector groups (listing mode) */
 let selectorGroups = [{
+    name: 'Default Card',
     card: '',
     title: ''
 }];
@@ -123,9 +124,16 @@ async function loadExistingSelectors() {
         } else {
             if (site.selectors) {
                 if (Array.isArray(site.selectors)) {
-                    selectorGroups = site.selectors;
+                    selectorGroups = site.selectors.map(function(s, idx) {
+                        return {
+                            name: s.name || ('Card Variant ' + (idx + 1)),
+                            card: s.card || '',
+                            title: s.title || ''
+                        };
+                    });
                 } else {
                     selectorGroups = [{
+                        name: site.selectors.name || 'Default Card',
                         card: site.selectors.card || '',
                         title: site.selectors.title || ''
                     }];
@@ -168,47 +176,67 @@ function getPanelHTML() {
             }
             .group-tabs {
                 display: flex;
-                gap: 4px;
-                align-items: center;
-                margin-bottom: 12px;
-                flex-wrap: wrap;
+                flex-direction: column;
+                gap: 6px;
+                margin-bottom: 16px;
+                max-height: 180px;
+                overflow-y: auto;
+                padding-right: 4px;
             }
-            .group-tab {
-                background: rgba(255, 255, 255, 0.08);
+            .group-tab-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(255, 255, 255, 0.05);
                 border: 1px solid rgba(255, 255, 255, 0.12);
-                color: rgba(255, 255, 255, 0.6);
-                min-width: 28px;
-                height: 28px;
-                border-radius: 6px;
+                border-radius: 8px;
+                padding: 6px 10px;
                 cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                font-weight: 600;
-                transition: all 0.15s;
-                padding: 0 8px;
+                transition: all 0.15s ease;
             }
-            .group-tab:hover {
+            .group-tab-row:hover {
+                background: rgba(117, 81, 255, 0.15);
+                border-color: rgba(117, 81, 255, 0.3);
+            }
+            .group-tab-row.active {
                 background: rgba(117, 81, 255, 0.25);
-                border-color: rgba(117, 81, 255, 0.4);
+                border-color: rgba(117, 81, 255, 0.5);
             }
-            .group-tab.active {
-                background: rgba(117, 81, 255, 0.35);
-                border-color: rgba(117, 81, 255, 0.6);
-                color: #fff;
-            }
-            .group-tab.complete {
+            .group-tab-row.complete {
                 border-color: rgba(16, 185, 129, 0.4);
             }
-            .group-tab .group-check-icon {
-                display: inline-block;
-                width: 8px;
-                height: 8px;
-                margin-left: 3px;
-                vertical-align: middle;
+            .group-num {
+                font-size: 12px;
+                font-weight: 600;
+                color: rgba(255, 255, 255, 0.5);
+                min-width: 16px;
             }
-            .group-tab.complete .group-check-icon {
+            .group-name-input {
+                flex: 1;
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid transparent;
+                color: #fff;
+                font-size: 12px;
+                padding: 2px 0;
+                font-family: inherit;
+                outline: none;
+                transition: border-color 0.15s;
+                width: 100%;
+            }
+            .group-name-input:focus {
+                border-bottom-color: rgba(117, 81, 255, 0.8);
+            }
+            .group-name-input::placeholder {
+                color: rgba(255, 255, 255, 0.3);
+            }
+            .group-check-icon {
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                flex-shrink: 0;
+            }
+            .group-tab-row.complete .group-check-icon {
                 mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>');
                 -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>');
                 mask-repeat: no-repeat;
@@ -217,21 +245,41 @@ function getPanelHTML() {
                 -webkit-mask-size: contain;
                 background-color: #10b981;
             }
-            .group-add-btn {
+            .group-delete-btn {
+                background: transparent;
+                border: none;
+                color: rgba(255, 255, 255, 0.4);
+                cursor: pointer;
+                padding: 2px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: all 0.15s;
+                flex-shrink: 0;
+            }
+            .group-delete-btn:hover {
+                background: rgba(239, 68, 68, 0.2);
+                color: #ef4444;
+            }
+            .group-add-row-btn {
                 background: rgba(255, 255, 255, 0.05);
                 border: 1px dashed rgba(255, 255, 255, 0.2);
-                color: rgba(255, 255, 255, 0.4);
-                width: 28px;
-                height: 28px;
-                border-radius: 6px;
+                color: rgba(255, 255, 255, 0.6);
+                padding: 8px;
+                border-radius: 8px;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 16px;
+                gap: 6px;
+                font-size: 12px;
+                font-weight: 500;
                 transition: all 0.15s;
+                width: 100%;
+                margin-top: 4px;
             }
-            .group-add-btn:hover {
+            .group-add-row-btn:hover {
                 background: rgba(117, 81, 255, 0.2);
                 border-color: rgba(117, 81, 255, 0.4);
                 color: #fff;
@@ -811,6 +859,18 @@ async function saveConfiguration() {
         if (isReaderMode) {
             sites[idx].readerSelectors = { ...readerSelectors };
         } else {
+            // Validation for mandatory naming of cards
+            for (var i = 0; i < selectorGroups.length; i++) {
+                var group = selectorGroups[i];
+                if (!group.name || group.name.trim() === '') {
+                    alert(`Please provide a name for Variant ${i + 1}. All variants must be named.`);
+                    if (shadowRoot) {
+                        const emptyInput = shadowRoot.querySelector(`.group-name-input[data-group-index="${i}"]`);
+                        if (emptyInput) emptyInput.focus();
+                    }
+                    return;
+                }
+            }
             sites[idx].selectors = selectorGroups;
         }
         sites[idx].updatedAt = Date.now();
@@ -856,36 +916,69 @@ export function cleanup() {
 }
 
 /**
- * Renders variant group tabs as inline buttons.
- * Each variant is a numbered button; the active one is highlighted.
- * Click to switch, right-click to delete (if more than one group exists).
+ * Renders variant group tabs as a vertical list of rows.
+ * Each variant is a row with a number and an input field to edit its name.
+ * Click a row to select it, or click the delete button to remove it.
  */
 function renderGroupTabs() {
     if (!shadowRoot) return;
     const container = shadowRoot.getElementById('groupTabs');
     if (!container) return;
 
-    const buttons = selectorGroups.map((group, i) => {
+    const rowsHtml = selectorGroups.map((group, i) => {
         const isActive = i === activeGroupIndex;
         const isComplete = !!group.card && !!group.title;
-        let cls = 'group-tab';
+        let cls = 'group-tab-row';
         if (isActive) cls += ' active';
         if (isComplete) cls += ' complete';
-        return `<button class="${cls}" data-group-index="${i}" title="Variant ${i + 1}${isComplete ? ' (complete)' : ''}\nRight-click to delete">${i + 1}<span class="group-check-icon"></span></button>`;
+        
+        const nameVal = group.name || '';
+        
+        return `
+            <div class="${cls}" data-group-index="${i}">
+                <span class="group-num">${i + 1}.</span>
+                <input type="text" class="group-name-input" data-group-index="${i}" value="${nameVal}" placeholder="Card name (e.g. Grid view)..." />
+                <span class="group-check-icon"></span>
+                ${selectorGroups.length > 1 ? `<button class="group-delete-btn" data-group-index="${i}" title="Delete Variant">${ICONS.CLOSE}</button>` : ''}
+            </div>
+        `;
     }).join('');
 
-    container.innerHTML = `${buttons}<button class="group-add-btn" id="addGroupBtn" title="Add Variant">+</button>`;
+    container.innerHTML = `
+        <div style="font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;">Card Variants</div>
+        ${rowsHtml}
+        <button class="group-add-row-btn" id="addGroupBtn">${ICONS.TARGET} Add Card Variant</button>
+    `;
 
-    // Wire up group tab clicks
-    container.querySelectorAll('.group-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-            activeGroupIndex = parseInt(btn.dataset.groupIndex);
-            setActiveField('card');
-            renderGroupTabs();
+    // Wire up group tab row clicks
+    container.querySelectorAll('.group-tab-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (e.target.closest('.group-delete-btn')) return;
+            const idx = parseInt(row.dataset.groupIndex);
+            if (activeGroupIndex !== idx) {
+                activeGroupIndex = idx;
+                setActiveField('card');
+                renderGroupTabs();
+            }
         });
+    });
 
-        btn.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
+    // Wire up input changes and propagation control
+    container.querySelectorAll('.group-name-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+            const idx = parseInt(input.dataset.groupIndex);
+            selectorGroups[idx].name = e.target.value;
+        });
+        
+        input.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    // Wire up delete button clicks
+    container.querySelectorAll('.group-delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (selectorGroups.length <= 1) return;
             const idx = parseInt(btn.dataset.groupIndex);
             selectorGroups.splice(idx, 1);
@@ -899,10 +992,15 @@ function renderGroupTabs() {
 
     // Wire up add button
     container.querySelector('#addGroupBtn')?.addEventListener('click', () => {
-        selectorGroups.push({ card: '', title: '' });
+        selectorGroups.push({ name: '', card: '', title: '' });
         activeGroupIndex = selectorGroups.length - 1;
         setActiveField('card');
         renderGroupTabs();
+        
+        setTimeout(() => {
+            const newInput = shadowRoot?.querySelector(`.group-name-input[data-group-index="${activeGroupIndex}"]`);
+            if (newInput) newInput.focus();
+        }, 50);
     });
 }
 

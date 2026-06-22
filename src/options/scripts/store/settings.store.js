@@ -26,7 +26,7 @@ const STATE_TO_STORAGE_MAP = {
 
 export const useSettingsStore = defineStore('settings', {
     state: () => ({
-        activeTab: 'settings', // Current visible tab in options page
+        activeTab: 'saved-entries', 
         theme: 'dark',
         isCustomTheme: false,
         customTheme: {

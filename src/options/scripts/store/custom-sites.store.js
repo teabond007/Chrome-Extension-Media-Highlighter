@@ -55,10 +55,17 @@ export const useCustomSitesStore = defineStore('customSites', {
                     url: siteData.url || (`https://${siteData.hostname || ''}`),
                     name: siteData.name || 'Untitled Site',
                     type: siteData.type || 'manga',
-                    selectors: {
+                    selectors: Array.isArray(siteData.selectors) ? siteData.selectors.map(function(s, idx) {
+                        return {
+                            name: s.name || ('Card Variant ' + (idx + 1)),
+                            card: s.card || '',
+                            title: s.title || ''
+                        };
+                    }) : [{
+                        name: siteData.selectors?.name || 'Default Card',
                         card: siteData.selectors?.card || '',
                         title: siteData.selectors?.title || ''
-                    },
+                    }],
                     readerSelectors: siteData.readerSelectors || {
                         readerDetect: '',
                         readerTitle: '',
@@ -91,10 +98,21 @@ export const useCustomSitesStore = defineStore('customSites', {
                 // Copy updates
                 Object.keys(updates).forEach(key => {
                     if (key === 'selectors' && updates.selectors) {
-                        site.selectors = {
-                            card: updates.selectors.card || '',
-                            title: updates.selectors.title || ''
-                        };
+                        if (Array.isArray(updates.selectors)) {
+                            site.selectors = updates.selectors.map(function(s, idx) {
+                                return {
+                                    name: s.name || ('Card Variant ' + (idx + 1)),
+                                    card: s.card || '',
+                                    title: s.title || ''
+                                };
+                            });
+                        } else {
+                            site.selectors = [{
+                                name: updates.selectors.name || 'Default Card',
+                                card: updates.selectors.card || '',
+                                title: updates.selectors.title || ''
+                            }];
+                        }
                     } else if (key === 'readerSelectors' && updates.readerSelectors) {
                         site.readerSelectors = {
                             readerDetect: updates.readerSelectors.readerDetect || '',

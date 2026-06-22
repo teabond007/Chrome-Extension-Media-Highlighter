@@ -106,6 +106,7 @@ async function startAddSite() {
             name: newSiteName.value || hostname,
             type: newSiteType.value,
             selectors: [{
+                name: 'Default Card',
                 card: '',
                 title: ''
             }]

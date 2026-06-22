@@ -34,7 +34,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/main.js-loader-07602ae8.js"
+        "assets/main.js-loader-4d1a7ef0.js"
       ],
       "matches": [
         "*://fallback.custom-sites.local/*"
@@ -64,7 +64,7 @@
       "resources": [
         "assets/library-service-751ca515.js",
         "assets/_plugin-vue_export-helper-6b5903ed.js",
-        "assets/main.js-680e2a5c.js"
+        "assets/main.js-038875f1.js"
       ],
       "use_dynamic_url": false
     }
