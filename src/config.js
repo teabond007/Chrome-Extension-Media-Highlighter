@@ -7,9 +7,12 @@
 
 /**
  * Default status colors shared across all platforms.
+ * Dual-case keys are intentional: Title Case keys represent display names (used by UI elements like
+ * StatusPicker or overlay tooltips) while lowercase keys represent internal status identifiers
+ * (used by library card enhancers and CSS classes).
  * @type {Object<string, string>}
  */
-export const STATUS_COLORS = {
+export const STATUS_COLORS = Object.freeze({
     // Display names (used by StatusPicker, overlay tooltips)
     'Reading': '#10b981',
     'Watching': '#10b981',
@@ -35,17 +38,17 @@ export const STATUS_COLORS = {
     're-reading': '#a855f7',
     're-watching': '#a855f7',
     'default': '#9ca3af'
-};
+});
 
 /**
  * Default border styling configuration.
  * @type {{size: number, style: string, radius: string}}
  */
-export const BORDER_DEFAULTS = {
+export const BORDER_DEFAULTS = Object.freeze({
     size: 4,
     style: 'solid',
     radius: '8px'
-};
+});
 
 
 /**
@@ -59,7 +62,7 @@ export const BORDER_DEFAULTS = {
  * Toggles: Boolean feature flags and operational switches (true/false)
  * @type {Object<string, string>}
  */
-export const TOGGLES = {
+export const TOGGLES = Object.freeze({
     // Core Features
     FAMILY_FRIENDLY: 'FamilyFriendlyfeatureEnabled',
     HISTORY_TRACKING: 'SyncandMarkReadfeatureEnabled',
@@ -79,26 +82,26 @@ export const TOGGLES = {
     READER_STATUS_PICKER: 'readerStatusPicker',
     
     IS_CUSTOM_THEME: 'isCustomTheme'
-};
+});
 
 /**
  * Settings: Configurable values, preferences and metadata strings
  * @type {Object<string, string>}
  */
-export const SETTINGS = {
+export const SETTINGS = Object.freeze({
     THEME: 'theme',
     CUSTOM_THEME_DATA: 'customThemeData',
     HIGHLIGHT_THICKNESS: 'CustomBorderSize',
     LIBRARY_THICKNESS: 'LibraryBorderSize',
     BORDER_STYLE: 'GlobalBorderStyle',
     VIEW_MODE: 'cardViewSize' // Unified from cardViewSize/libraryViewMode
-};
+});
 
 /**
  * Data: Complex objects, collections, caches and timestamps
  * @type {Object<string, string>}
  */
-export const DATA = {
+export const DATA = Object.freeze({
     LIBRARY_ENTRIES: 'savedEntriesMerged',
     READING_HISTORY: 'savedReadChapters',
     PERSONAL_DATA: 'libraryPersonalData',
@@ -111,13 +114,13 @@ export const DATA = {
     // Timestamps
     LAST_BACKUP: 'LastBackupDate',
     LAST_SYNC_TIME: 'lastSyncTime'
-};
+});
 
 /**
  * Library Entry Keys: Standardized property names for manga objects
  * @type {Object<string, string>}
  */
-export const LIBRARY_ENTRY_KEYS = {
+export const LIBRARY_ENTRY_KEYS = Object.freeze({
     TITLE: 'title',
     STATUS: 'status',
     CHAPTERS: 'chapters',
@@ -133,39 +136,39 @@ export const LIBRARY_ENTRY_KEYS = {
     CUSTOM_STATUS: 'customStatus',
     LAST_READ: 'lastRead',
     LAST_UPDATED: 'lastUpdated'
-};
+});
 
 
 /**
  * Configuration for remote API integrations.
  */
-export const API_CONFIG = {
-    MANGADEX: {
+export const API_CONFIG = Object.freeze({
+    MANGADEX: Object.freeze({
         BASE_URL: 'https://api.mangadex.org',
         CACHE_EXPIRY_MS: 7 * 24 * 60 * 60 * 1000, // 7 days
         MIN_REQUEST_INTERVAL: 500
-    },
-    ANILIST: {
+    }),
+    ANILIST: Object.freeze({
         BASE_URL: 'https://graphql.anilist.co',
         MIN_REQUEST_INTERVAL: 750
-    }
-};
+    })
+});
 
 /**
  * Progress Tracking constants
  */
-export const PROGRESS_CONFIG = {
+export const PROGRESS_CONFIG = Object.freeze({
     SAVE_DELAY: 5000,                  // 5 seconds
     SCROLL_THRESHOLD: 0.1              // 10% scroll
-};
+});
 
 /**
  * Library configuration
  */
-export const LIBRARY_CONFIG = {
+export const LIBRARY_CONFIG = Object.freeze({
     INITIAL_LOAD: 100,
     LOAD_MORE_INCREMENT: 100
-};
+});
 
 /**
  * Library Defaults

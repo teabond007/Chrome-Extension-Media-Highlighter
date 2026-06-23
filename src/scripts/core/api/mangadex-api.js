@@ -5,6 +5,7 @@
  */
 
 import { API_CONFIG, DATA } from '../../../config.js';
+import { sleep } from './api-utils.js';
 
 /** @type {string} Base URL for MangaDex API */
 const MANGADEX_API_URL = API_CONFIG.MANGADEX.BASE_URL;
@@ -23,17 +24,6 @@ const RETRY_DELAY_BASE = 2000;
 
 /** @const {number} Cache expiry time in milliseconds (7 days) */
 const CACHE_EXPIRY_MS = API_CONFIG.MANGADEX.CACHE_EXPIRY_MS;
-
-/**
- * Utility function to pause execution with optional jitter.
- * @param {number} ms - Milliseconds to sleep.
- * @param {boolean} [useJitter=true] - Add random delay to prevent synchronized retries.
- * @returns {Promise<void>}
- */
-function sleep(ms, useJitter = true) {
-  const jitter = useJitter ? Math.floor(Math.random() * 300) : 0;
-  return new Promise(resolve => setTimeout(resolve, ms + jitter));
-}
 
 /**
  * Normalizes manga titles for better search matching on MangaDex.
@@ -70,19 +60,15 @@ function cleanTitle(title, aggressive = false) {
  * @returns {Promise<object|null>} Cached data or null if not found/expired.
  */
 async function getCachedData(title) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([DATA.MANGADEX_CACHE], (data) => {
-      const cache = data[DATA.MANGADEX_CACHE] || {};
-      const key = title.toLowerCase().trim();
-      const entry = cache[key];
-      
-      if (entry && (Date.now() - entry.timestamp < CACHE_EXPIRY_MS)) {
-        resolve(entry.data);
-      } else {
-        resolve(null);
-      }
-    });
-  });
+  const data = await chrome.storage.local.get([DATA.MANGADEX_CACHE]);
+  const cache = data[DATA.MANGADEX_CACHE] || {};
+  const key = title.toLowerCase().trim();
+  const entry = cache[key];
+
+  if (entry && (Date.now() - entry.timestamp < CACHE_EXPIRY_MS)) {
+    return entry.data;
+  }
+  return null;
 }
 
 /**
@@ -91,19 +77,16 @@ async function getCachedData(title) {
  * @param {object|null} data - Data to cache (null for NOT_FOUND).
  */
 async function setCachedData(title, data) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([DATA.MANGADEX_CACHE], (storageData) => {
-      const cache = storageData[DATA.MANGADEX_CACHE] || {};
-      const key = title.toLowerCase().trim();
-      
-      cache[key] = {
-        data: data,
-        timestamp: Date.now()
-      };
-      
-      chrome.storage.local.set({ [DATA.MANGADEX_CACHE]: cache }, resolve);
-    });
-  });
+  const storageData = await chrome.storage.local.get([DATA.MANGADEX_CACHE]);
+  const cache = storageData[DATA.MANGADEX_CACHE] || {};
+  const key = title.toLowerCase().trim();
+
+  cache[key] = {
+    data: data,
+    timestamp: Date.now()
+  };
+
+  await chrome.storage.local.set({ [DATA.MANGADEX_CACHE]: cache });
 }
 
 /**
@@ -143,14 +126,6 @@ function transformToAnilistFormat(mdManga) {
 
   // Determine isAdult from content rating
   const isAdult = attrs.contentRating === 'erotica' || attrs.contentRating === 'pornographic';
-
-  // Map content rating / demographic to format
-  const formatMap = {
-    'shounen': 'MANGA',
-    'shoujo': 'MANGA',
-    'seinen': 'MANGA',
-    'josei': 'MANGA'
-  };
 
   // Determine format from tags
   let format = 'MANGA';
@@ -232,7 +207,7 @@ export async function fetchMangaFromMangadex(title, retryCount = 0) {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
   if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    await sleep(MIN_REQUEST_INTERVAL - timeSinceLastRequest);
+    await sleep(MIN_REQUEST_INTERVAL - timeSinceLastRequest, true);
   }
   lastRequestTime = Date.now();
 
@@ -259,7 +234,7 @@ export async function fetchMangaFromMangadex(title, retryCount = 0) {
       if (retryCount < MAX_RETRIES) {
         const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount);
         console.warn(`MangaDex rate limited. Waiting ${delay/1000}s before retry.`);
-        await sleep(delay);
+        await sleep(delay, true);
         return fetchMangaFromMangadex(title, retryCount + 1);
       }
       console.error('MangaDex rate limit exceeded after max retries');
@@ -269,7 +244,7 @@ export async function fetchMangaFromMangadex(title, retryCount = 0) {
     // Handle server errors
     if (response.status >= 500) {
       if (retryCount < MAX_RETRIES) {
-        await sleep(RETRY_DELAY_BASE * Math.pow(2, retryCount));
+        await sleep(RETRY_DELAY_BASE * Math.pow(2, retryCount), true);
         return fetchMangaFromMangadex(title, retryCount + 1);
       }
       return null;
@@ -309,7 +284,7 @@ export async function fetchMangaFromMangadex(title, retryCount = 0) {
   } catch (error) {
     console.error('Network error fetching from MangaDex:', error);
     if (retryCount < MAX_RETRIES) {
-      await sleep(RETRY_DELAY_BASE * Math.pow(2, retryCount));
+      await sleep(RETRY_DELAY_BASE * Math.pow(2, retryCount), true);
       return fetchMangaFromMangadex(title, retryCount + 1);
     }
     return null;
@@ -322,33 +297,28 @@ export async function fetchMangaFromMangadex(title, retryCount = 0) {
  * @returns {Promise<number>} Number of entries removed.
  */
 export async function cleanMangadexCache() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([DATA.MANGADEX_CACHE], (data) => {
-      const cache = data[DATA.MANGADEX_CACHE] || {};
-      const now = Date.now();
-      let removed = 0;
-      
-      Object.keys(cache).forEach(i => {
-        if (now - cache[i].timestamp > CACHE_EXPIRY_MS) {
-          delete cache[i];
-          removed++;
-        }
-      });
-      
-      chrome.storage.local.set({ [DATA.MANGADEX_CACHE]: cache }, () => resolve(removed));
-    });
+  const data = await chrome.storage.local.get([DATA.MANGADEX_CACHE]);
+  const cache = data[DATA.MANGADEX_CACHE] || {};
+  const now = Date.now();
+  let removed = 0;
+
+  Object.keys(cache).forEach(i => {
+    if (now - cache[i].timestamp > CACHE_EXPIRY_MS) {
+      delete cache[i];
+      removed++;
+    }
   });
+
+  await chrome.storage.local.set({ [DATA.MANGADEX_CACHE]: cache });
+  return removed;
 }
 
 /**
  * Clears all entries from the MangaDex cache immediately.
- * for erase & sync all button in library)
+ * (used by erase & sync all button in library)
  * @async
  * @returns {Promise<void>}
  */
 export async function wipeMangadexCache() {
-  return new Promise((resolve) => {
-    chrome.storage.local.remove(DATA.MANGADEX_CACHE, resolve);
-  });
+  await chrome.storage.local.remove(DATA.MANGADEX_CACHE);
 }
-

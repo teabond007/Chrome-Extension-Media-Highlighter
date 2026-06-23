@@ -34,14 +34,14 @@ export function mergeStorageData(currentData, remoteData) {
     var mergedData = {};
     
     // First, copy everything from currentData to mergedData
-    for (var key in currentData) {
-        mergedData[key] = currentData[key];
+    for (var currentKey in currentData) {
+        mergedData[currentKey] = currentData[currentKey];
     }
     
     // Second, copy everything from remoteData to mergedData
     // This will overwrite values from currentData if the keys are the same
-    for (var key in remoteData) {
-        mergedData[key] = remoteData[key];
+    for (var remoteKey in remoteData) {
+        mergedData[remoteKey] = remoteData[remoteKey];
     }
 
     // We don't want the metadata in the final saved data
@@ -54,45 +54,27 @@ export function mergeStorageData(currentData, remoteData) {
     var currentLibrary = currentData[DATA.LIBRARY_ENTRIES];
     
     if (Array.isArray(remoteLibrary) || Array.isArray(currentLibrary)) {
-        var finalLibrary = [];
+        const libraryMap = new Map();
         
-        // Start with the items we already have
+        // Load current library entries into Map
         if (Array.isArray(currentLibrary)) {
-            for (var i = 0; i < currentLibrary.length; i++) {
-                var entry = currentLibrary[i];
+            currentLibrary.forEach(entry => {
                 if (entry && entry.title) {
-                    finalLibrary.push(entry);
+                    libraryMap.set(entry.title.toLowerCase(), entry);
                 }
-            }
+            });
         }
         
-        // Add items from the remote data
+        // Merge remote library entries (remote overwrites current on key collision)
         if (Array.isArray(remoteLibrary)) {
-            for (var i = 0; i < remoteLibrary.length; i++) {
-                var remoteItem = remoteLibrary[i];
-                if (remoteItem && remoteItem.title) {
-                    var foundIndex = -1;
-                    var remoteTitleLower = remoteItem.title.toLowerCase();
-                    
-                    // Look if we already have this manga in our list
-                    for (var j = 0; j < finalLibrary.length; j++) {
-                        if (finalLibrary[j].title.toLowerCase() == remoteTitleLower) {
-                            foundIndex = j;
-                            break;
-                        }
-                    }
-                    
-                    if (foundIndex != -1) {
-                        // If it's already there, we update it with the remote version
-                        finalLibrary[foundIndex] = remoteItem;
-                    } else {
-                        // If it's new, we just add it to the end
-                        finalLibrary.push(remoteItem);
-                    }
+            remoteLibrary.forEach(entry => {
+                if (entry && entry.title) {
+                    libraryMap.set(entry.title.toLowerCase(), entry);
                 }
-            }
+            });
         }
-        mergedData[DATA.LIBRARY_ENTRIES] = finalLibrary;
+        
+        mergedData[DATA.LIBRARY_ENTRIES] = Array.from(libraryMap.values());
     }
 
     // --- Merge Custom Statuses ---
@@ -100,36 +82,25 @@ export function mergeStorageData(currentData, remoteData) {
     var currentStatuses = currentData[DATA.CUSTOM_STATUSES];
     
     if (Array.isArray(remoteStatuses) || Array.isArray(currentStatuses)) {
-        var finalStatuses = [];
+        const statusMap = new Map();
         
         if (Array.isArray(currentStatuses)) {
-            for (var i = 0; i < currentStatuses.length; i++) {
-                if (currentStatuses[i] && currentStatuses[i].name) {
-                    finalStatuses.push(currentStatuses[i]);
+            currentStatuses.forEach(s => {
+                if (s && s.name) {
+                    statusMap.set(s.name.toLowerCase(), s);
                 }
-            }
+            });
         }
         
         if (Array.isArray(remoteStatuses)) {
-            for (var i = 0; i < remoteStatuses.length; i++) {
-                var s = remoteStatuses[i];
+            remoteStatuses.forEach(s => {
                 if (s && s.name) {
-                    var sNameLower = s.name.toLowerCase();
-                    var found = false;
-                    for (var j = 0; j < finalStatuses.length; j++) {
-                        if (finalStatuses[j].name.toLowerCase() == sNameLower) {
-                            finalStatuses[j] = s;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (found == false) {
-                        finalStatuses.push(s);
-                    }
+                    statusMap.set(s.name.toLowerCase(), s);
                 }
-            }
+            });
         }
-        mergedData[DATA.CUSTOM_STATUSES] = finalStatuses;
+        
+        mergedData[DATA.CUSTOM_STATUSES] = Array.from(statusMap.values());
     }
 
     // --- Merge Reading History ---
@@ -150,18 +121,8 @@ export function mergeStorageData(currentData, remoteData) {
             var currentChapters = finalHistory[hKey];
             
             if (Array.isArray(remoteChapters) && Array.isArray(currentChapters)) {
-                // Mix chapters together and make sure we don't have duplicates
-                var mixed = [];
-                for (var k = 0; k < currentChapters.length; k++) {
-                    mixed.push(currentChapters[k]);
-                }
-                for (var k = 0; k < remoteChapters.length; k++) {
-                    // Only add if not already in the list
-                    if (mixed.indexOf(remoteChapters[k]) == -1) {
-                        mixed.push(remoteChapters[k]);
-                    }
-                }
-                finalHistory[hKey] = mixed;
+                // Mix chapters together using a Set to prevent duplicates
+                finalHistory[hKey] = [...new Set([...currentChapters, ...remoteChapters])];
             } else {
                 finalHistory[hKey] = remoteChapters;
             }
@@ -186,35 +147,25 @@ export function mergeStorageData(currentData, remoteData) {
     var currentSites = currentData[DATA.CUSTOM_SITES];
     
     if (Array.isArray(remoteSites) || Array.isArray(currentSites)) {
-        var finalSites = [];
+        const siteMap = new Map();
         
         if (Array.isArray(currentSites)) {
-            for (var i = 0; i < currentSites.length; i++) {
-                if (currentSites[i] && currentSites[i].hostname) {
-                    finalSites.push(currentSites[i]);
+            currentSites.forEach(site => {
+                if (site && site.hostname) {
+                    siteMap.set(site.hostname.toLowerCase(), site);
                 }
-            }
+            });
         }
         
         if (Array.isArray(remoteSites)) {
-            for (var i = 0; i < remoteSites.length; i++) {
-                var site = remoteSites[i];
+            remoteSites.forEach(site => {
                 if (site && site.hostname) {
-                    var found = false;
-                    for (var j = 0; j < finalSites.length; j++) {
-                        if (finalSites[j].hostname == site.hostname) {
-                            finalSites[j] = site;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (found == false) {
-                        finalSites.push(site);
-                    }
+                    siteMap.set(site.hostname.toLowerCase(), site);
                 }
-            }
+            });
         }
-        mergedData[DATA.CUSTOM_SITES] = finalSites;
+        
+        mergedData[DATA.CUSTOM_SITES] = Array.from(siteMap.values());
     }
 
     return mergedData;

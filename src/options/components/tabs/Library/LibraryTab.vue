@@ -351,11 +351,24 @@ const addNewEntry = async () => {
 };
 
 const syncMissing = async () => {
-    await libraryStore.forceSync(false);
+    if (libraryStore.isSyncing) {
+        if (!confirm("A sync is already in progress. Do you want to restart it?")) return;
+    }
+    const success = await libraryStore.forceSync(false);
+    if (success) {
+        alert("Missing info sync completed!");
+    }
 };
 
 const syncAll = async () => {
-    await libraryStore.forceSync(true);
+    if (libraryStore.isSyncing) {
+        if (!confirm("A sync is already in progress. Do you want to restart it?")) return;
+    }
+    if (!confirm("WARNING: This will wipe all cached metadata and re-fetch from scratch. This can take a long time and hits rate limits. Are you sure?")) return;
+    const success = await libraryStore.forceSync(true);
+    if (success) {
+        alert("Full library sync completed!");
+    }
 };
 
 

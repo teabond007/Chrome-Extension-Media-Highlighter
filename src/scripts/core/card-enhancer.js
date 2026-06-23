@@ -288,9 +288,9 @@ export class CardEnhancer {
      */
     applyQuickActions(card, entry) {
         const callbacks = {
-            continue: (e) => this.handleContinueReading(e, card),
-            status: (e, target) => this.handleStatusChange(e, target || null, card),
-            details: (e) => this.handleViewDetails(e, card)
+            continue: (ent) => this.handleContinueReading(ent, card),
+            status: (ent, target) => this.handleStatusChange(ent, target || null, card),
+            details: (ent) => this.handleViewDetails(ent, card)
         };
 
         OverlayFactory.mountQuickActions(card.element, entry, this.adapter, callbacks);
@@ -355,7 +355,7 @@ export class CardEnhancer {
             btn,
             entry,
             this.settings.customStatuses,
-            (newStatus, ent) => this.saveStatusChange(ent, newStatus)
+            (newStatus, ent) => this.saveStatusChange(ent, newStatus, card)
         );
     }
 
@@ -381,14 +381,16 @@ export class CardEnhancer {
      * Save a new status for an entry to Chrome storage.
      * @param {Object} entry - Library entry
      * @param {string} newStatus - New status string
+     * @param {{ element: HTMLElement, data: Object }} [card] - The card element being updated
      */
-    async saveStatusChange(entry, newStatus) {
+    async saveStatusChange(entry, newStatus, card) {
         try {
             const data = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES]);
             const entries = data[DATA.LIBRARY_ENTRIES] || [];
 
             const normalizedTitle = this.normalizeTitle(entry.title);
             const foundIdx = entries.findIndex(e => e && this.normalizeTitle(e.title) === normalizedTitle);
+            let updatedEntry;
 
             if (foundIdx !== -1) {
                 entries[foundIdx].status = newStatus;
@@ -396,6 +398,7 @@ export class CardEnhancer {
                 if (this.adapter.type) {
                     entries[foundIdx].type = this.adapter.type;
                 }
+                updatedEntry = entries[foundIdx];
             } else {
                 const newEntry = {
                     title: entry.title,
@@ -418,20 +421,31 @@ export class CardEnhancer {
                 }
 
                 entries.push(newEntry);
+                updatedEntry = newEntry;
                 console.log('[CardEnhancer] Added new entry to library: ' + entry.title);
             }
 
-            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(entries)) });
+            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entries });
             console.log(`[CardEnhancer] Status saved: ${entry.title} -> ${newStatus}`);
 
-            // Re-run enhancements after a short delay so storage can settle
-            setTimeout(() => {
-                document.querySelectorAll('[data-bmh-enhanced]').forEach(el => {
-                    el.removeAttribute('data-bmh-enhanced');
-                    el.querySelectorAll('.bmh-vue-container, .bmh-vue-badge-container').forEach(child => child.remove());
-                });
-                this.enhanceAll();
-            }, 100);
+            // Perform targeted card update instead of full sweep
+            if (card) {
+                // Remove existing overlays and badge containers from this card
+                card.element.querySelectorAll('.bmh-vue-container, .bmh-vue-badge-container').forEach(child => child.remove());
+                
+                // Also remove highlight border if applied to parent
+                const target = card.element.closest('li') || card.element;
+                target.style.removeProperty('border');
+                target.style.removeProperty('border-radius');
+                target.style.removeProperty('box-shadow');
+                target.style.removeProperty('box-sizing');
+                target.style.removeProperty('overflow');
+                target.style.removeProperty('min-height');
+                target.style.removeProperty('display');
+
+                // Re-apply enhancements to this card with the updated entry
+                this.applyEnhancements(card, updatedEntry);
+            }
         } catch (e) {
             console.error('[CardEnhancer] Failed to save status:', e);
         }
@@ -449,6 +463,7 @@ export class CardEnhancer {
 
     /**
      * Get the highest chapter number from an array of chapter strings/numbers.
+     * Uses a regex pattern `^(\\d+\\.?\\d*)` to extract the leading float/integer number.
      * @param {Array<string|number>} chapters
      * @returns {number}
      */

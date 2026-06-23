@@ -10,6 +10,9 @@ import { CardEnhancer } from './card-enhancer.js';
 import { OverlayFactory } from './overlay-factory.js';
 import { TOGGLES, SETTINGS, DATA } from '../../config.js';
 
+/** Trigger words in URL paths that commonly precede manga/entry ID */
+const URL_ID_TRIGGERS = ['manga', 'series', 'title', 'comic', 'read'];
+
 /**
  * Generic adapter that implements PlatformAdapter interface
  * but uses runtime configuration instead of hardcoded values.
@@ -175,10 +178,7 @@ export class GenericAdapter {
             const parts = path.split("/");
             
             // Try to find parts that usually come before the ID
-            const triggerIdx = parts.findIndex(p => {
-                const lower = p.toLowerCase();
-                return lower === "manga" || lower === "series" || lower === "title" || lower === "comic" || lower === "read";
-            });
+            const triggerIdx = parts.findIndex(p => URL_ID_TRIGGERS.includes(p.toLowerCase()));
 
             if (triggerIdx !== -1 && parts[triggerIdx + 1]) {
                 return parts[triggerIdx + 1];
@@ -314,10 +314,8 @@ export class GenericAdapter {
  */
 export async function initCustomSite(config, settings) {
     console.log(`[BMH-Custom] Initializing adapter for ${config.name || config.hostname}...`);
-    console.log('[BMH-Custom] Config:', config);
-    console.log('[BMH-Custom] Selectors:', config.selectors);
 
-    // Validate that we have minimum required selectors
+    // --- Validation ---
     const hasCard = Array.isArray(config.selectors)
         ? config.selectors.some(s => s.card)
         : config.selectors?.card;
@@ -327,7 +325,7 @@ export async function initCustomSite(config, settings) {
         return null;
     }
 
-    // Inject overlay styles
+    // --- Adapter Setup ---
     if (!document.getElementById('bmh-custom-styles')) {
         const styles = document.createElement('style');
         styles.id = 'bmh-custom-styles';
@@ -344,8 +342,8 @@ export async function initCustomSite(config, settings) {
     const count = await enhancer.enhanceAll();
     console.log(`[BMH-Custom] Enhanced ${count} cards.`);
 
-    // Use MutationObserver instead of setInterval to watch for dynamic DOM updates (e.g. infinite scroll)
-    var debounceTimeout = null;
+    // --- MutationObserver ---
+    let debounceTimeout = null;
     var observer = new MutationObserver(function(mutations) {
         if (debounceTimeout) {
             clearTimeout(debounceTimeout);

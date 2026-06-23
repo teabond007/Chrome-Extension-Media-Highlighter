@@ -174,7 +174,7 @@ export async function upsertEntry(entryData) {
             updatedEntry = newEntry;
         }
 
-        await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(library)) });
+        await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: library });
         console.log("[LibraryService] Saved successfully!");
         return updatedEntry;
     } catch (err) {
@@ -219,7 +219,7 @@ export async function updateProgress(query, progress) {
         entry.status = alignStatusForMediaType(entry.status, entry.type);
     }
 
-    await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(library)) });
+    await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: library });
     return entry;
 }
 
@@ -271,10 +271,6 @@ export async function savePersonalData(entry, updates) {
         ...updates,
         lastModified: Date.now()
     };
-    
-    if (updated.notes !== undefined) {
-        updated.notes = updated.notes.trim();
-    }
     
     allData[id] = updated;
     await chrome.storage.local.set({ [DATA.PERSONAL_DATA]: allData });

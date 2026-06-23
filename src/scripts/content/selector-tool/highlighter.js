@@ -122,18 +122,18 @@ function isStableClass(cls) {
     if (cls.startsWith('_')) return false;
     if (cls.startsWith('css-')) return false;
     
-    var numberCount = 0;
-    for (var i = 0; i < cls.length; i++) {
-        if (!isNaN(parseInt(cls[i]))) {
-            numberCount++;
-        }
-    }
-    
+    const numberCount = (cls.match(/\d/g) || []).length;
     if (numberCount > 2) return false;
     
     return true;
 }
 
+/**
+ * Builds a CSS selector segment for a DOM element.
+ * Combines the tag name with any stable classes.
+ * @param {HTMLElement} node - The DOM element
+ * @returns {string} The CSS selector segment
+ */
 function buildSegment(node) {
     var tag = node.tagName.toLowerCase();
     var classes = "";
@@ -174,6 +174,12 @@ function buildDomPath(element) {
     return segments;
 }
 
+/**
+ * Generalizes the path up to a specified index, stripping class qualifiers from the final segment.
+ * @param {string[]} fullPathSegments - The path segments
+ * @param {number} targetIndex - The index up to which to generalize the path
+ * @returns {string} The generalized selector string
+ */
 function generalizePath(fullPathSegments, targetIndex) {
     if (fullPathSegments.length == 0) return "";
     

@@ -50,33 +50,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /**
- * Logs messages via the extension's messaging system.
- * @param {string|Object} txt - The message to log.
+ * Helper to retrieve content script and CSS paths from the extension manifest.
+ * @returns {{jsPath: string|undefined, cssPath: string|undefined}}
  */
-function Log(txt) {
-  const text = typeof txt === "object" ? JSON.stringify(txt) : txt;
-  safeSendMessage({ type: "log", text: text });
+function getContentScriptPaths() {
+  const manifest = chrome.runtime.getManifest();
+  const jsPath = manifest.content_scripts?.[0]?.js?.[0];
+  const cssPath = manifest.content_scripts?.[0]?.css?.[0];
+  return { jsPath, cssPath };
 }
-
-/**
- * Safe wrapper for chrome.runtime.sendMessage to suppress connection errors.
- * @param {Object} message - Message object to send.
- */
-function safeSendMessage(message) {
-  try {
-    if (chrome.runtime && chrome.runtime.id) {
-      chrome.runtime.sendMessage(message, () => {
-        const err = chrome.runtime.lastError;
-        if (err && err.message !== "Could not establish connection. Receiving end does not exist.") {
-          // Only log real errors
-        }
-      });
-    }
-  } catch (e) {
-    // Ignore context invalidated errors
-  }
-}
-
 
 let isUpdatingCustomSites = false;
 
@@ -116,7 +98,7 @@ async function handleCustomSitesUpdate(sendResponse) {
 
     // If no enabled sites, we're done
     if (enabledSites.length === 0) {
-      Log('Custom sites: No enabled sites, skipping registration');
+      console.log('[Background] Custom sites: No enabled sites, skipping registration');
       if (sendResponse) sendResponse({ success: true, count: 0 });
       return;
     }
@@ -124,24 +106,22 @@ async function handleCustomSitesUpdate(sendResponse) {
     // Build match patterns for all enabled custom sites
     const matches = enabledSites.map(site => `*://${site.hostname}/*`);
     
-    // Get the manifest to find the correct compiled content script path
-    const manifest = chrome.runtime.getManifest();
-    const contentScriptPath = manifest.content_scripts?.[0]?.js?.[0];
-    const cssPath = manifest.content_scripts?.[0]?.css?.[0];
+    // Get the correct compiled content script paths from manifest
+    const { jsPath, cssPath } = getContentScriptPaths();
     
-    if (!contentScriptPath) {
+    if (!jsPath) {
       console.error('[Background] Could not find content script path in manifest');
       if (sendResponse) sendResponse({ success: false, error: 'No content script path found' });
       return;
     }
 
-    Log(`Custom sites: Using content script: ${contentScriptPath}`);
+    console.log(`[Background] Custom sites: Using content script: ${jsPath}`);
 
     // Register the content script and associated CSS for custom sites
     const scriptProps = {
       id: CUSTOM_SCRIPT_ID,
       matches: matches,
-      js: [contentScriptPath],
+      js: [jsPath],
       runAt: 'document_idle'
     };
     
@@ -151,7 +131,7 @@ async function handleCustomSitesUpdate(sendResponse) {
 
     await chrome.scripting.registerContentScripts([scriptProps]);
 
-    Log(`Custom sites: Registered script for ${enabledSites.length} site(s): ${matches.join(', ')}`);
+    console.log(`[Background] Custom sites: Registered script for ${enabledSites.length} site(s): ${matches.join(', ')}`);
     if (sendResponse) sendResponse({ success: true, count: enabledSites.length });
 
   } catch (error) {
@@ -174,12 +154,12 @@ async function handleCustomSitesUpdate(sendResponse) {
  */
 async function handleFetchMetadata(title, storageKey, entryType, sendResponse) {
   try {
-    Log(`Fetching metadata for: ${title} (${entryType})`);
+    console.log(`[Background] Fetching metadata for: ${title} (${entryType})`);
 
     const data = await getMergedMetadata(title, entryType || 'manga');
 
     if (!data) {
-      Log(`No metadata found for: ${title}`);
+      console.log(`[Background] No metadata found for: ${title}`);
       if (sendResponse) sendResponse({ success: false });
       return;
     }
@@ -196,7 +176,7 @@ async function handleFetchMetadata(title, storageKey, entryType, sendResponse) {
       // Ensure array integrity and plain object serialization
       const finalLibrary = Array.isArray(library) ? library : [];
       await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: finalLibrary });
-      Log(`Metadata saved for: ${title}`);
+      console.log(`[Background] Metadata saved for: ${title}`);
     }
 
     if (sendResponse) sendResponse({ success: true });
@@ -216,22 +196,20 @@ async function handleFetchMetadata(title, storageKey, entryType, sendResponse) {
 async function handleInjectSelectorTool(tabId, sendResponse) {
   console.log("[Background] handleInjectSelectorTool called for tab: " + tabId);
   try {
-    var manifest = chrome.runtime.getManifest();
-    var contentScriptPath = manifest.content_scripts?.[0]?.js?.[0];
-    var cssPath = manifest.content_scripts?.[0]?.css?.[0];
+    const { jsPath, cssPath } = getContentScriptPaths();
 
-    if (!contentScriptPath) {
+    if (!jsPath) {
       console.log('[Background] No content script path found for injection');
       if (sendResponse) sendResponse({ success: false, error: 'No content script path found' });
       return;
     }
 
-    console.log(`[Background] Injecting content script ${contentScriptPath} into tab ${tabId}`);
+    console.log(`[Background] Injecting content script ${jsPath} into tab ${tabId}`);
 
     // Inject the compiled content script javascript file
     await chrome.scripting.executeScript({
       target: { tabId: tabId },
-      files: [contentScriptPath]
+      files: [jsPath]
     });
 
     // If a compiled CSS path is defined, we inject that as well
@@ -253,13 +231,12 @@ async function handleInjectSelectorTool(tabId, sendResponse) {
 
 // Re-register custom sites on extension startup
 chrome.runtime.onStartup.addListener(async () => {
-  Log('Extension startup - checking custom sites...');
-  handleCustomSitesUpdate(() => {});
+  console.log('[Background] Extension startup - checking custom sites...');
+  handleCustomSitesUpdate();
 });
 
 
 chrome.runtime.onInstalled.addListener(async () => {
-  Log('Extension installed/updated - checking custom sites...');
-  handleCustomSitesUpdate(() => {});
-  
+  console.log('[Background] Extension installed/updated - checking custom sites...');
+  handleCustomSitesUpdate();
 });

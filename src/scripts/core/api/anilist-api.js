@@ -1,17 +1,17 @@
 /**
  * @fileoverview AniList API interaction module.
  * This file handles getting manga data from Anilist.
-
  */
 
 import { API_CONFIG } from '../../../config.js';
+import { sleep } from './api-utils.js';
 
 // The URL for the Anilist API
 var ANILIST_API_URL = API_CONFIG.ANILIST.BASE_URL;
 
 // This is the query we send to Anilist to get the manga data
 // It asks for things like titles, cover images, genres and descriptions
-var graphQLQuery = `
+const graphQLQuery = `
 query ($search: String, $type: MediaType) {
   Page (page: 1, perPage: 1) {
     media (search: $search, type: $type) {
@@ -66,15 +66,9 @@ query ($search: String, $type: MediaType) {
 var lastRequestTime = 0;
 var MIN_INTERVAL = API_CONFIG.ANILIST.MIN_REQUEST_INTERVAL;
 
-/**
- * This function makes the code wait for a bit.
- * @param {number} ms - How many milliseconds to wait
- */
-function wait(ms) {
-    return new Promise(function(resolve) {
-        setTimeout(resolve, ms);
-    });
-}
+// Words that commonly appear in titles but confuse the Anilist search
+// Using a single pre-compiled regex is faster than looping over an array
+var NOISE_WORDS_REGEX = /colored|remake|full color|digital|vertical|scanlation|official|ver|manga|manhwa|manhua|remastered|raw|chapter|episode|ep|sub|dub|season/gi;
 
 /**
  * This function cleans up the title so Anilist can find it better.
@@ -93,18 +87,7 @@ function cleanTitle(title, aggressive) {
 
     if (aggressive == true) {
         // If we are still not finding it, we remove common words that cause trouble
-        var wordsToRemove = [
-            "colored", "remake", "full color", "digital",
-            "vertical", "scanlation", "official", "ver",
-            "manga", "manhwa", "manhua", "remastered",
-            "raw", "chapter", "episode", "ep", "sub", "dub", "season"
-        ];
-        
-        for (var i = 0; i < wordsToRemove.length; i++) {
-            var word = wordsToRemove[i];
-            var regex = new RegExp(word, "gi");
-            cleaned = cleaned.replace(regex, " ");
-        }
+        cleaned = cleaned.replace(NOISE_WORDS_REGEX, ' ');
 
         // We only keep letters, numbers and spaces as a last resort
         cleaned = cleaned.replace(/[^a-zA-Z0-9 ]/g, ' ');
@@ -119,17 +102,18 @@ function cleanTitle(title, aggressive) {
  * It will try a few times with different title cleaning if it doesn't find anything.
  * @param {string} title - The title of the manga to search for
  * @param {number} attempt - Which try this is (starts at 0)
+ * @param {string} [mediaType='manga'] - Media type: 'manga' or 'anime'
  */
 export async function fetchMangaFromAnilist(title, attempt = 0, mediaType = 'manga') {
     // We check if we need to wait a bit before the next request
     var now = Date.now();
     var timeDiff = now - lastRequestTime;
     if (timeDiff < MIN_INTERVAL) {
-        await wait(MIN_INTERVAL - timeDiff);
+        await sleep(MIN_INTERVAL - timeDiff);
     }
     lastRequestTime = Date.now();
 
-    // Decide what title to search for
+    // Decide what title to search for based on which attempt this is
     var searchTitle = title;
     if (attempt == 1) {
         // Try cleaning simple things
@@ -169,9 +153,9 @@ export async function fetchMangaFromAnilist(title, attempt = 0, mediaType = 'man
 
         // 429 means we are making too many requests
         if (response.status == 429) {
-            if (attempt < 4) {
+            if (attempt < 3) {
                 console.log("Anilist rate limit reached. Waiting 5 seconds before retry...");
-                await wait(5000);
+                await sleep(5000);
                 return fetchMangaFromAnilist(title, attempt + 1, mediaType);
             }
             return null;
@@ -181,7 +165,7 @@ export async function fetchMangaFromAnilist(title, attempt = 0, mediaType = 'man
         if (response.ok == false) {
             console.log("Anilist API error: " + response.status);
             if (attempt < 3) {
-                await wait(2000);
+                await sleep(2000);
                 return fetchMangaFromAnilist(title, attempt + 1, mediaType);
             }
             return null;
@@ -230,7 +214,7 @@ export async function fetchMangaFromAnilist(title, attempt = 0, mediaType = 'man
         
         // Try again if we can
         if (attempt < 3) {
-            await wait(2000);
+            await sleep(2000);
             return fetchMangaFromAnilist(title, attempt + 1, mediaType);
         }
         return null;

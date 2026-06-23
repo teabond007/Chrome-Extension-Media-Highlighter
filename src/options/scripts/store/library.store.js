@@ -92,7 +92,7 @@ export const useLibraryStore = defineStore('library', {
                 const titleToMatch = entry.title.toLowerCase().trim();
                 this.entries = this.entries.filter(e => e && e.title.toLowerCase().trim() !== titleToMatch);
                 
-                await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(this.entries)) });
+                await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: this.entries });
                 console.log('[LibraryStore] Removed successfully');
             } catch (err) {
                 console.error('[LibraryStore] Error in removeEntry:', err);
@@ -103,9 +103,9 @@ export const useLibraryStore = defineStore('library', {
          * Helper to save the current entries array to storage.
          * @param {Array} entriesList - The array of entries to save.
          */
-        saveEntries(entriesList) {
+        async saveEntries(entriesList) {
             this.entries = entriesList;
-            chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entriesList });
+            return await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entriesList });
         },
 
         /**
@@ -166,17 +166,9 @@ export const useLibraryStore = defineStore('library', {
         /**
          * Sync metadata for entries in the library.
          * @param {boolean} wipeAll - If true, clears existing metadata to force a fresh lookup.
+         * @returns {Promise<boolean>} True if sync succeeded
          */
         async forceSync(wipeAll = false) {
-            if (this.isSyncing) {
-                if (!confirm("A sync is already in progress. Do you want to restart it?")) return;
-                this.isSyncing = false;
-            }
-
-            if (wipeAll) {
-                if (!confirm("WARNING: This will wipe all cached metadata and re-fetch from scratch. This can take a long time and hits rate limits. Are you sure?")) return;
-            }
-
             this.isSyncing = true;
             console.log(wipeAll ? "Starting full forced library sync..." : "Starting missing info sync...");
 
@@ -193,9 +185,10 @@ export const useLibraryStore = defineStore('library', {
                 }
 
                 await this.fetchMissingMetadata(this.entries);
-                alert(wipeAll ? "Full library sync completed!" : "Missing info sync completed!");
+                return true;
             } catch (e) {
                 console.error("Sync failed:", e);
+                return false;
             } finally {
                 this.isSyncing = false;
                 this.syncProgress = { current: 0, total: 0, title: '' };
@@ -214,8 +207,7 @@ export const useLibraryStore = defineStore('library', {
             window.dispatchEvent(new CustomEvent('library-sync-start', { detail: { total: missing.length } }));
 
             for (let i = 0; i < missing.length; i++) {
-                const staleEntry = missing[i];
-                const liveEntry = entriesList.find(e => e && e.title === staleEntry.title);
+                const liveEntry = missing[i];
                 if (!liveEntry) continue;
 
                 this.syncProgress = { current: i + 1, total: missing.length, title: liveEntry.title };
@@ -235,7 +227,7 @@ export const useLibraryStore = defineStore('library', {
                 }
             }
 
-            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: JSON.parse(JSON.stringify(entriesList)) });
+            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entriesList });
             this.entries = entriesList;
             window.dispatchEvent(new CustomEvent('library-sync-complete'));
         }

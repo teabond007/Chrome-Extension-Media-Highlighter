@@ -44,16 +44,15 @@ export function getStatusInfo(status, customStatusName, customStatuses) {
 
     // Fallback: keyword matching for status categorization
     if (!color) {
-        let type = "default";
-        if (statusLower.includes("re-reading") || statusLower.includes("re-watching")) type = "re-watching";
-        else if (statusLower.includes("reading") || statusLower.includes("watching")) type = "reading";
-        else if (statusLower === "read") type = "read";
-        else if (statusLower.includes("completed")) type = "completed";
-        else if (statusLower.includes("dropped")) type = "dropped";
-        else if (statusLower.includes("hold")) type = "onhold";
-        else if (statusLower.includes("plan")) type = "planning";
-        
-        color = STATUS_COLORS[type] || STATUS_COLORS.default;
+        for (const [key, val] of Object.entries(STATUS_COLORS)) {
+            if (statusLower.includes(key.toLowerCase())) {
+                color = val;
+                break;
+            }
+        }
+        if (!color) {
+            color = STATUS_COLORS.default;
+        }
     }
 
     return {
@@ -90,6 +89,3 @@ export function getFormatName(format, country) {
     };
     return formats[format] || format || 'Unknown';
 }
-
-
-

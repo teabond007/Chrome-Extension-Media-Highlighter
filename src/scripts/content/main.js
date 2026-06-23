@@ -12,7 +12,7 @@ import { TOGGLES, SETTINGS, DATA } from '../../config.js';
 /**
  * Main bootstrap function to start the extension logic on the page.
  */
-function bootstrap() {
+async function bootstrap() {
     // If the extension context is gone, we must stop
     if (!chrome.runtime || !chrome.runtime.id) {
         return;
@@ -28,15 +28,12 @@ function bootstrap() {
         DATA.CUSTOM_SITES,
         TOGGLES.QUICK_ACTIONS,
         TOGGLES.LIBRARY_SHOW_RIBBONS,
+        TOGGLES.LIBRARY_BORDERS,
         TOGGLES.READER_STATUS_PICKER
     ];
 
-    // We use a callback here because it is simpler than Promises
-    chrome.storage.local.get(settingsKeys, function(settings) {
-        if (chrome.runtime.lastError) {
-            console.error("[BMH] Storage error:", chrome.runtime.lastError);
-            return;
-        }
+    try {
+        var settings = await chrome.storage.local.get(settingsKeys);
 
         // Try to find a matching custom site configuration
         console.log("[BMH] Checking custom sites for " + currentHost + "...");
@@ -73,7 +70,7 @@ function bootstrap() {
             var checkPageMode = function() {
                 // Stop checking if the extension context was invalidated
                 if (!chrome.runtime || !chrome.runtime.id) {
-                    clearInterval(modeInterval);
+                    clearInterval(pageModeInterval);
                     return;
                 }
 
@@ -122,11 +119,13 @@ function bootstrap() {
             checkPageMode();
 
             // Set up a recurring interval to check for SPA transitions or dynamically loaded reader elements
-            var modeInterval = setInterval(checkPageMode, 1000);
+            var pageModeInterval = setInterval(checkPageMode, 1000);
         } else {
             console.warn("[BMH] No adapter found for host: " + currentHost);
         }
-    });
+    } catch (err) {
+        console.error("[BMH] Storage error or bootstrap failure:", err);
+    }
 }
 
 // Prevent multiple initializations in the same window

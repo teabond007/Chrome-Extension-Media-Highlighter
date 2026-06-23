@@ -14,6 +14,88 @@ import QuickActions from '../content/components/QuickActions.vue';
 import StatusPicker from '../content/components/StatusPicker.vue';
 import StatusBadge from '../content/components/StatusBadge.vue';
 
+/**
+ * Shared CSS rules for the status picker dropdown.
+ * Used in both mountStatusPicker (Shadow DOM) and injectStyles.
+ */
+const PICKER_CSS = `
+    .bmh-status-picker {
+        background: rgba(20, 20, 25, 0.98);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 12px;
+        min-width: 180px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+
+        animation: bmh-picker-slide 0.2s ease-out;
+        font-family: sans-serif;
+    }
+    @keyframes bmh-picker-slide {
+        from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .bmh-picker-header {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .bmh-picker-options {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .bmh-picker-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-align: left;
+    }
+    .bmh-picker-option:hover { background: rgba(255, 255, 255, 0.1); }
+    .bmh-picker-option.active { background: rgba(255, 255, 255, 0.15); }
+    .bmh-picker-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+`;
+
+/**
+ * Helper to get default status list for manga vs anime.
+ * @param {string} type - 'manga' or 'anime'
+ * @returns {Array<{ name: string, color: string }>}
+ */
+export function getDefaultStatuses(type) {
+    return type === 'anime' ? [
+        { name: 'Watching', color: '#4ade80' },
+        { name: 'Completed', color: '#60a5fa' },
+        { name: 'Plan to Watch', color: '#fbbf24' },
+        { name: 'On-Hold', color: '#f97316' },
+        { name: 'Dropped', color: '#ef4444' },
+        { name: 'Re-watching', color: '#a855f7' }
+    ] : [
+        { name: 'Reading', color: '#4ade80' },
+        { name: 'Completed', color: '#60a5fa' },
+        { name: 'Plan to Read', color: '#fbbf24' },
+        { name: 'On-Hold', color: '#f97316' },
+        { name: 'Dropped', color: '#ef4444' },
+        { name: 'Re-reading', color: '#a855f7' }
+    ];
+}
+
 
 /**
  * Factory for creating quick action tooltips on manga/webtoon cards.
@@ -42,60 +124,7 @@ export class OverlayFactory {
 
         // Inject Picker styles
         const style = document.createElement('style');
-        style.textContent = `
-            .bmh-status-picker {
-                background: rgba(20, 20, 25, 0.98);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                border-radius: 12px;
-                padding: 12px;
-                min-width: 180px;
-                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-
-                animation: bmh-picker-slide 0.2s ease-out;
-                font-family: sans-serif;
-            }
-            @keyframes bmh-picker-slide {
-                from { opacity: 0; transform: scale(0.95) translateY(-8px); }
-                to { opacity: 1; transform: scale(1) translateY(0); }
-            }
-            .bmh-picker-header {
-                font-size: 11px;
-                color: rgba(255, 255, 255, 0.5);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                padding-bottom: 8px;
-                margin-bottom: 8px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            }
-            .bmh-picker-options {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            }
-            .bmh-picker-option {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-                padding: 10px 12px;
-                background: transparent;
-                border: none;
-                border-radius: 8px;
-                color: #fff;
-                font-size: 13px;
-                cursor: pointer;
-                transition: all 0.15s ease;
-                text-align: left;
-            }
-            .bmh-picker-option:hover { background: rgba(255, 255, 255, 0.1); }
-            .bmh-picker-option.active { background: rgba(255, 255, 255, 0.15); }
-            .bmh-picker-dot {
-                width: 10px;
-                height: 10px;
-                border-radius: 50%;
-                flex-shrink: 0;
-            }
-        `;
+        style.textContent = PICKER_CSS;
         shadow.appendChild(style);
 
         const rect = host.getBoundingClientRect();
@@ -436,11 +465,18 @@ export class OverlayFactory {
      * Get color for a reading status.
      */
     static getStatusColor(status) {
-        const statusLower = (status || '').toLowerCase();
+        const statusLower = (status || '').toLowerCase().trim();
         
-        // Try to match from centralized config
+        // Try to match exact keys first
         for (const [key, color] of Object.entries(STATUS_COLORS)) {
-            if (statusLower === key.toLowerCase() || statusLower.includes(key.toLowerCase())) {
+            if (statusLower === key.toLowerCase()) {
+                return color;
+            }
+        }
+
+        // Substring fallback
+        for (const [key, color] of Object.entries(STATUS_COLORS)) {
+            if (statusLower.includes(key.toLowerCase())) {
                 return color;
             }
         }
@@ -457,21 +493,7 @@ export class OverlayFactory {
 
         const safeCustomStatuses = Array.isArray(customStatuses) ? customStatuses : [];
 
-        const defaultStatuses = entry.type === 'anime' ? [
-            { name: 'Watching', color: '#4ade80' },
-            { name: 'Completed', color: '#60a5fa' },
-            { name: 'Plan to Watch', color: '#fbbf24' },
-            { name: 'On-Hold', color: '#f97316' },
-            { name: 'Dropped', color: '#ef4444' },
-            { name: 'Re-watching', color: '#a855f7' }
-        ] : [
-            { name: 'Reading', color: '#4ade80' },
-            { name: 'Completed', color: '#60a5fa' },
-            { name: 'Plan to Read', color: '#fbbf24' },
-            { name: 'On-Hold', color: '#f97316' },
-            { name: 'Dropped', color: '#ef4444' },
-            { name: 'Re-reading', color: '#a855f7' }
-        ];
+        const defaultStatuses = getDefaultStatuses(entry.type);
 
         const allStatuses = [...defaultStatuses, ...safeCustomStatuses];
 
@@ -607,70 +629,7 @@ export class OverlayFactory {
             }
 
             /* ===== PICKERS (Status) ===== */
-            .bmh-status-picker {
-                position: fixed;
-                background: rgba(20, 20, 25, 0.98);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                border-radius: 12px;
-                padding: 12px;
-                min-width: 180px;
-                z-index: 10000;
-                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-
-                animation: bmh-picker-slide 0.2s ease-out;
-            }
-
-            @keyframes bmh-picker-slide {
-                from { opacity: 0; transform: scale(0.95) translateY(-8px); }
-                to { opacity: 1; transform: scale(1) translateY(0); }
-            }
-
-            .bmh-picker-header {
-                font-size: 11px;
-                color: rgba(255, 255, 255, 0.5);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                padding-bottom: 8px;
-                margin-bottom: 8px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            }
-
-            .bmh-picker-options {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            }
-
-            .bmh-picker-option {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-                padding: 10px 12px;
-                background: transparent;
-                border: none;
-                border-radius: 8px;
-                color: #fff;
-                font-size: 13px;
-                cursor: pointer;
-                transition: all 0.15s ease;
-                text-align: left;
-            }
-
-            .bmh-picker-option:hover {
-                background: rgba(255, 255, 255, 0.1);
-            }
-
-            .bmh-picker-option.active {
-                background: rgba(255, 255, 255, 0.15);
-            }
-
-            .bmh-picker-dot {
-                width: 10px;
-                height: 10px;
-                border-radius: 50%;
-                flex-shrink: 0;
-            }
+            ${PICKER_CSS}
 
             /* Animation keyframes */
             @keyframes bmh-pulse {
@@ -684,6 +643,7 @@ export class OverlayFactory {
 
     /**
      * Alias for backward compatibility.
+     * @deprecated Use OverlayFactory.injectStyles() instead.
      */
     static injectPickerStyles() {
         OverlayFactory.injectStyles();
