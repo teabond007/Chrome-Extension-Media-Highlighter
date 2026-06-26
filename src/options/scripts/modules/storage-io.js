@@ -23,6 +23,27 @@ export async function gatherStorageData() {
 }
 
 /**
+ * Detects and assigns the correct media type ('anime' or 'manga') to an entry if missing.
+ * @param {Object} entry - Library entry object
+ */
+function normalizeEntryType(entry) {
+    if (!entry || !entry.title) return;
+    if (entry.type) return;
+
+    var isAnime = false;
+    var status = entry.status;
+    var format = entry.anilistData ? entry.anilistData.format : null;
+
+    if (status === 'Watching' || status === 'Plan to Watch' || status === 'Re-watching') {
+        isAnime = true;
+    } else if (format === 'TV' || format === 'TV_SHORT' || format === 'MOVIE' || format === 'SPECIAL' || format === 'OVA' || format === 'ONA' || format === 'MUSIC') {
+        isAnime = true;
+    }
+
+    entry.type = isAnime ? 'anime' : 'manga';
+}
+
+/**
  * This function mixes two sets of data together (local data and remote data).
  * It makes sure we don't have duplicates and keeps the newest stuff.
  * @param {Object} currentData - The local data from storage.get(null)
@@ -58,20 +79,24 @@ export function mergeStorageData(currentData, remoteData) {
         
         // Load current library entries into Map
         if (Array.isArray(currentLibrary)) {
-            currentLibrary.forEach(entry => {
+            for (var i = 0; i < currentLibrary.length; i++) {
+                var entry = currentLibrary[i];
                 if (entry && entry.title) {
+                    normalizeEntryType(entry);
                     libraryMap.set(entry.title.toLowerCase(), entry);
                 }
-            });
+            }
         }
         
         // Merge remote library entries (remote overwrites current on key collision)
         if (Array.isArray(remoteLibrary)) {
-            remoteLibrary.forEach(entry => {
+            for (var j = 0; j < remoteLibrary.length; j++) {
+                var entry = remoteLibrary[j];
                 if (entry && entry.title) {
+                    normalizeEntryType(entry);
                     libraryMap.set(entry.title.toLowerCase(), entry);
                 }
-            });
+            }
         }
         
         mergedData[DATA.LIBRARY_ENTRIES] = Array.from(libraryMap.values());
@@ -186,6 +211,17 @@ export async function applyStorageData(data, isMerge) {
         if (data._exportMeta) {
             delete data._exportMeta;
         }
+        
+        var library = data[DATA.LIBRARY_ENTRIES];
+        if (Array.isArray(library)) {
+            for (var k = 0; k < library.length; k++) {
+                var entry = library[k];
+                if (entry) {
+                    normalizeEntryType(entry);
+                }
+            }
+        }
+        
         await chrome.storage.local.clear();
         await chrome.storage.local.set(data);
     }

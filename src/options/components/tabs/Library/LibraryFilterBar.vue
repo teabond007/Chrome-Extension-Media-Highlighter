@@ -24,13 +24,13 @@
         <div class="library-controls">
         
                 <div class="chapter-range-wrapper">
-                    <input type="number" v-model.number="filters.chapterMin" class="input-field input-sm" placeholder="Min" style="width: 70px;">
+                    <input type="number" :value="filters.chapterMin" @input="updateFilter('chapterMin', $event.target.value ? parseInt($event.target.value) : null)" class="input-field input-sm" placeholder="Min" style="width: 70px;">
                     <span class="range-separator">–</span>
-                    <input type="number" v-model.number="filters.chapterMax" class="input-field input-sm" placeholder="Max" style="width: 70px;">
+                    <input type="number" :value="filters.chapterMax" @input="updateFilter('chapterMax', $event.target.value ? parseInt($event.target.value) : null)" class="input-field input-sm" placeholder="Max" style="width: 70px;">
                 </div>
             
         
-                <select v-model="filters.lastUpdated" class="select-field select-sm">
+                <select :value="filters.lastUpdated" @change="updateFilter('lastUpdated', $event.target.value)" class="select-field select-sm">
                     <option value="all">Any Time</option>
                     <option value="7d">Last 7 Days</option>
                     <option value="30d">Last 30 Days</option>
@@ -39,7 +39,7 @@
                 </select>
         
 
-            <select v-model="filters.sort" class="select-field" style="width: 140px;">
+            <select :value="filters.sort" @change="updateFilter('sort', $event.target.value)" class="select-field" style="width: 140px;">
                 <option value="last-read-desc">Recently Read</option>
                 <option value="added-desc">Recently Added</option>
                 <option value="title-asc">A-Z</option>
@@ -53,7 +53,7 @@
 
 
 
-            <select v-model="filters.status" class="select-field">
+            <select :value="filters.status" @change="updateFilter('status', $event.target.value)" class="select-field">
                 <option value="All">All Statuses</option>
                 <option :value="mediaType === 'anime' ? 'Watching' : 'Reading'">{{ mediaType === 'anime' ? 'Watching' : 'Reading' }}</option>
                 <option value="Completed">Completed</option>
@@ -69,15 +69,15 @@
                 </template>
             </select>
 
-            <select v-model="filters.genre" class="select-field">
+            <select :value="filters.genre" @change="updateFilter('genre', $event.target.value)" class="select-field">
                 <option value="All">All Genres</option>
                 <option v-for="genre in availableGenres" :key="genre" :value="genre">{{ genre }}</option>
             </select>
 
-            <select v-model="filters.format" class="select-field">
+            <select :value="filters.format" @change="updateFilter('format', $event.target.value)" class="select-field">
                 <option value="All">All Formats</option>
                 <template v-if="mediaType === 'anime'">
-                    <option value="TV">TV Show</option>
+                    <option value="TV Show">TV Show</option>
                     <option value="Movie">Movie</option>
                     <option value="OVA">OVA</option>
                     <option value="ONA">ONA</option>
@@ -93,8 +93,8 @@
             </select>
 
             <div class="search-wrapper">
-                <input type="text" v-model="filters.search" placeholder="Search titles..." class="input-field">
-                <button v-if="filters.search" @click="filters.search = ''" class="search-clear-btn" title="Clear search">&times;</button>
+                <input type="text" :value="filters.search" @input="updateFilter('search', $event.target.value)" placeholder="Search titles..." class="input-field">
+                <button v-if="filters.search" @click="updateFilter('search', '')" class="search-clear-btn" title="Clear search">&times;</button>
             </div>
 
             <div class="view-toggle-group">
@@ -152,9 +152,18 @@ defineProps({
     }
 });
 
-defineEmits(['toggle-stats', 'set-view-size', 'clear-filters']);
+const emit = defineEmits(['toggle-stats', 'set-view-size', 'clear-filters', 'update:filter']);
 
 const settingsStore = useSettingsStore();
+
+/**
+ * Emits filter changes to the parent component.
+ * @param {string} key - Filter property name
+ * @param {any} value - Filter property value
+ */
+const updateFilter = (key, value) => {
+    emit('update:filter', { key, value });
+};
 
 const handleGuideRedirect = () => {
     settingsStore.activeTab = 'about';

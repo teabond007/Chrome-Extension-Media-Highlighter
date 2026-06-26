@@ -109,26 +109,45 @@ export function fuzzyScore(needle, haystack) {
  * @returns {Promise<Array>}
  */
 export async function loadLibrary() {
-    const data = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES]);
-    const list = data[DATA.LIBRARY_ENTRIES];
+    var data = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES]);
+    var list = data[DATA.LIBRARY_ENTRIES];
 
-    if (!Array.isArray(list)) return [];
+    if (!Array.isArray(list)) {
+        return [];
+    }
 
-    // Sanitize entries to ensure data integrity
-    list.forEach(entry => {
-        if (entry && entry.anilistData) {
-            const ani = entry.anilistData;
-            if (ani.genres !== undefined && !Array.isArray(ani.genres)) {
-                ani.genres = typeof ani.genres === 'string' ? [ani.genres] : [];
+    // Sanitize entries to ensure data integrity and backward-compatibility with older backups
+    for (var i = 0; i < list.length; i++) {
+        var entry = list[i];
+        if (entry) {
+            // Determine and populate the media type if missing from old backup schemas
+            if (!entry.type) {
+                var isAnime = false;
+                var status = entry.status;
+                var format = entry.anilistData ? entry.anilistData.format : null;
+                
+                if (status === 'Watching' || status === 'Plan to Watch' || status === 'Re-watching') {
+                    isAnime = true;
+                } else if (format === 'TV' || format === 'TV_SHORT' || format === 'MOVIE' || format === 'SPECIAL' || format === 'OVA' || format === 'ONA' || format === 'MUSIC') {
+                    isAnime = true;
+                }
+                entry.type = isAnime ? 'anime' : 'manga';
             }
-            if (ani.synonyms !== undefined && !Array.isArray(ani.synonyms)) {
-                ani.synonyms = typeof ani.synonyms === 'string' ? [ani.synonyms] : [];
-            }
-            if (ani.tags !== undefined && !Array.isArray(ani.tags)) {
-                ani.tags = typeof ani.tags === 'string' ? [{ name: ani.tags }] : [];
+
+            if (entry.anilistData) {
+                var ani = entry.anilistData;
+                if (ani.genres !== undefined && !Array.isArray(ani.genres)) {
+                    ani.genres = typeof ani.genres === 'string' ? [ani.genres] : [];
+                }
+                if (ani.synonyms !== undefined && !Array.isArray(ani.synonyms)) {
+                    ani.synonyms = typeof ani.synonyms === 'string' ? [ani.synonyms] : [];
+                }
+                if (ani.tags !== undefined && !Array.isArray(ani.tags)) {
+                    ani.tags = typeof ani.tags === 'string' ? [{ name: ani.tags }] : [];
+                }
             }
         }
-    });
+    }
 
     return list;
 }

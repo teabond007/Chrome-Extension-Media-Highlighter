@@ -35,6 +35,7 @@
                 @toggle-stats="toggleStats"
                 @set-view-size="setViewSize"
                 @clear-filters="clearFilters"
+                @update:filter="handleFilterUpdate"
             />
 
             <!-- Sync Progress Bar -->
@@ -178,7 +179,7 @@ const filteredEntries = computed(() => {
         const ani = entry.anilistData;
         
         // Family Friendly
-        if (familyFriendly && ani?.genres) {
+        if (familyFriendly && ani?.genres && Array.isArray(ani.genres)) {
             if (ani.isAdult) return false;
             if (ani.genres.some(g => g === 'Ecchi' || g === 'Hentai')) return false;
         }
@@ -203,7 +204,7 @@ const filteredEntries = computed(() => {
         
         // Genre
         if (hasGenre) {
-            if (!ani?.genres || !ani.genres.includes(filters.genre)) return false;
+            if (!ani?.genres || !Array.isArray(ani.genres) || !ani.genres.includes(filters.genre)) return false;
         }
         
         // Search
@@ -309,6 +310,16 @@ const clearFilters = () => {
     filters.status = 'All';
     filters.genre = 'All';
     filters.format = 'All';
+};
+
+/**
+ * Handles the filter update event emitted from LibraryFilterBar.
+ * @param {Object} payload - Event payload
+ * @param {string} payload.key - Filter property name
+ * @param {any} payload.value - Filter property value
+ */
+const handleFilterUpdate = ({ key, value }) => {
+    filters[key] = value;
 };
 
 

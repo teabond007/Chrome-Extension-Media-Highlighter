@@ -9,7 +9,6 @@
             <AppearanceTab v-show="settingsStore.activeTab === 'appearance'" />
             <LibraryTab v-show="settingsStore.activeTab === 'saved-entries'" mediaType="manga" />
             <LibraryTab v-show="settingsStore.activeTab === 'saved-anime'" mediaType="anime" />
-            <StatsTab v-show="settingsStore.activeTab === 'stats'" />
             <AboutTab v-show="settingsStore.activeTab === 'about'" />
             <CustomSitesTab v-show="settingsStore.activeTab === 'custom-sites'" />
             <BackupTab v-show="settingsStore.activeTab === 'backup'" />
@@ -38,7 +37,6 @@ import Sidebar from './components/Sidebar.vue';
 import GeneralTab from './components/tabs/General/GeneralTab.vue';
 import AppearanceTab from './components/tabs/Appearance/AppearanceTab.vue';
 import LibraryTab from './components/tabs/Library/LibraryTab.vue';
-import StatsTab from './components/tabs/Stats/StatsTab.vue';
 import AboutTab from './components/tabs/About/AboutTab.vue';
 import CustomSitesTab from './components/tabs/CustomSites/CustomSitesTab.vue';
 import BackupTab from './components/tabs/Backup/BackupTab.vue';
@@ -59,6 +57,7 @@ const applyTheme = (name) => {
     html.style.removeProperty('--bg-sidebar');
     html.style.removeProperty('--bg-card');
     html.style.removeProperty('--accent-primary');
+    html.style.removeProperty('--accent-primary-rgb');
     html.style.removeProperty('--text-primary');
     
     html.classList.remove('dark-mode', 'black-mode', 'neon-mode', 'light-mode');
@@ -70,6 +69,15 @@ const applyTheme = (name) => {
         html.style.setProperty('--bg-sidebar', ct.sidebar);
         html.style.setProperty('--bg-card', ct.sidebar);
         html.style.setProperty('--accent-primary', ct.accent);
+        
+        var hexToRgb = function(hex) {
+            if (!hex) return '67, 24, 255';
+            var cleanHex = hex.replace('#', '');
+            var num = parseInt(cleanHex, 16);
+            return ((num >> 16) & 255) + ', ' + ((num >> 8) & 255) + ', ' + (num & 255);
+        };
+        html.style.setProperty('--accent-primary-rgb', hexToRgb(ct.accent));
+        
         html.style.setProperty('--text-primary', ct.text);
         html.setAttribute('data-theme', 'custom');
     } else if (name === 'light') {

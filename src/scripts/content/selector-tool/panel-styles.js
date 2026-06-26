@@ -380,4 +380,40 @@ export var PANEL_CSS = `
         color: rgba(255, 255, 255, 0.7);
         text-align: center;
     }
+    .mode-toggle-container {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        padding: 3px;
+    }
+    .mode-btn {
+        flex: 1;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 11px;
+        font-weight: 600;
+        padding: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+    }
+    .mode-btn:hover {
+        color: #fff;
+    }
+    .mode-btn.active {
+        background: rgba(117, 81, 255, 0.3);
+        border: 1px solid rgba(117, 81, 255, 0.5);
+        color: #fff;
+    }
+    .path-display.interact-active {
+        border-color: rgba(117, 81, 255, 0.4);
+    }
 `;

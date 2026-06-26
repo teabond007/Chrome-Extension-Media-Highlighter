@@ -72,11 +72,6 @@
                                     style="padding: 2px 8px; font-size: 11px;">
                                     {{ showChapters ? (currentEntry.type === 'anime' ? 'Hide Episodes' : 'Hide Chapters') : (currentEntry.type === 'anime' ? 'Show Episodes' : 'Show Chapters') }}
                                 </button>
-                                <button class="btn btn-primary btn-sm" @click="handleMarkAllRead"
-                                    style="padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"
-                                    :title="currentEntry.type === 'anime' ? 'Mark all episodes as watched up to total' : 'Mark all chapters as read up to total'">
-                                    <span class="icon-svg icon-check"></span> {{ currentEntry.type === 'anime' ? 'Mark All Watched' : 'Mark All Read' }}
-                                </button>
                             </div>
                             <div v-if="showChapters" id="modalReadChaptersList" class="modal-chapters-list">
                                 <span v-for="ch in sortedChapters" :key="ch" class="chapter-pill">{{ currentEntry.type === 'anime' ? 'Ep. ' : 'Ch. ' }}{{ ch }}</span>
@@ -449,50 +444,6 @@ const loadHistoryChapters = () => {
     });
 };
  
-const handleMarkAllRead = async () => {
-    const isAnime = currentEntry.value?.type === 'anime';
-    const totalChapters = isAnime ? ani.value?.episodes : ani.value?.chapters;
-    if (!totalChapters || totalChapters <= 0) {
-        alert(`Unable to mark all as read: Total ${isAnime ? 'episode' : 'chapter'} count is unknown.`);
-        return;
-    }
- 
-    if (!confirm(`Mark all ${totalChapters} ${isAnime ? 'episodes as watched' : 'chapters as read'}?`)) return;
- 
-    const allChapters = Array.from({ length: totalChapters }, (_, i) => String(i + 1));
-    const slugify = (str) => str.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    const mangaSlug = currentEntry.value[LIBRARY_ENTRY_KEYS.MANGA_SLUG]?.split('.')[0] || slugify(currentEntry.value.title);
- 
-    chrome.storage.local.get([DATA.READING_HISTORY], (data) => {
-        const history = data[DATA.READING_HISTORY] || {};
-        history[mangaSlug] = allChapters;
-        
-        chrome.storage.local.set({ [DATA.READING_HISTORY]: history }, () => {
-            historyChapters.value = allChapters;
-            currentEntry.value.readChapters = totalChapters;
-            currentEntry.value[LIBRARY_ENTRY_KEYS.LAST_READ_CHAPTER] = String(totalChapters);
-            currentEntry.value[LIBRARY_ENTRY_KEYS.LAST_READ] = Date.now();
-            
-            // Save updated entry
-            chrome.storage.local.get([DATA.LIBRARY_ENTRIES], (res) => {
-                const raw = res[DATA.LIBRARY_ENTRIES];
-                const merged = Array.isArray(raw) ? raw : [];
-                const idx = merged.findIndex(e => e.anilistData?.id === ani.value?.id || e[LIBRARY_ENTRY_KEYS.MANGA_SLUG] === currentEntry.value[LIBRARY_ENTRY_KEYS.MANGA_SLUG]);
-                if (idx !== -1) {
-                    merged[idx] = { ...currentEntry.value }; // Use spread for reactivity
-                    chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: merged }, () => {
-                        // Notify Vue tab that data has changed
-                        if (window.refreshLibraryData) window.refreshLibraryData();
-                    });
-                }
-            });
-            
-            const btn = document.querySelector('.btn-primary.btn-sm');
-            if (btn) playSuccessAnimation(btn);
-        });
-    });
-};
- 
 // Personal Data Methods
 const saveRating = async (val) => {
     await LibraryService.saveRating(currentEntry.value, val);
@@ -607,31 +558,44 @@ onMounted(() => {
                         &.modal-sidebar-history {
                             margin-top: 12px;
                             gap: 10px;
- 
+
                             .modal-history-actions {
                                 display: flex;
                                 gap: 8px;
                                 flex-wrap: wrap;
                             }
- 
+
                             .modal-chapters-list {
-                                margin-top: 10px;
-                                padding: 10px;
-                                background: rgba(255, 255, 255, 0.05);
+                                margin-top: 12px;
+                                padding: 12px;
+                                background: rgba(0, 0, 0, 0.25);
+                                border: 1px solid var(--border-color);
                                 border-radius: var(--radius-sm, 6px);
                                 max-height: 150px;
                                 overflow-y: auto;
                                 font-size: 12px;
                                 display: flex;
                                 flex-wrap: wrap;
-                                gap: 6px;
- 
+                                gap: 8px;
+
                                 .chapter-pill {
-                                    background: var(--bg-card);
-                                    border: 1px solid var(--border-color);
-                                    padding: 2px 8px;
-                                    border-radius: 4px;
-                                    color: var(--text-secondary);
+                                    background: rgba(var(--accent-primary-rgb, 67, 24, 255), 0.08);
+                                    border: 1px solid rgba(var(--accent-primary-rgb, 67, 24, 255), 0.18);
+                                    padding: 4px 10px;
+                                    border-radius: 100px;
+                                    color: var(--text-primary);
+                                    font-weight: 600;
+                                    letter-spacing: 0.3px;
+                                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                                    cursor: default;
+                                    user-select: none;
+
+                                    &:hover {
+                                        background: rgba(var(--accent-primary-rgb, 67, 24, 255), 0.18);
+                                        border-color: var(--accent-primary);
+                                        transform: translateY(-1px);
+                                        box-shadow: 0 4px 8px rgba(var(--accent-primary-rgb, 67, 24, 255), 0.15);
+                                    }
                                 }
                             }
                         }

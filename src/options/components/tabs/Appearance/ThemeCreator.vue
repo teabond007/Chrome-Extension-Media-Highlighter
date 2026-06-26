@@ -49,6 +49,15 @@ const applyCustomTheme = () => {
     html.style.setProperty('--bg-sidebar', customTheme.value.sidebar);
     html.style.setProperty('--bg-card', customTheme.value.sidebar);
     html.style.setProperty('--accent-primary', customTheme.value.accent);
+    
+    var hexToRgb = function(hex) {
+        if (!hex) return '67, 24, 255';
+        var cleanHex = hex.replace('#', '');
+        var num = parseInt(cleanHex, 16);
+        return ((num >> 16) & 255) + ', ' + ((num >> 8) & 255) + ', ' + (num & 255);
+    };
+    html.style.setProperty('--accent-primary-rgb', hexToRgb(customTheme.value.accent));
+    
     html.style.setProperty('--text-primary', customTheme.value.text);
     
     settingsStore.updateSetting('isCustomTheme', true);
@@ -69,6 +78,7 @@ const resetToDefault = () => {
     html.style.removeProperty('--bg-sidebar');
     html.style.removeProperty('--bg-card');
     html.style.removeProperty('--accent-primary');
+    html.style.removeProperty('--accent-primary-rgb');
     html.style.removeProperty('--text-primary');
     
     html.classList.remove('black-mode', 'neon-mode', 'light-mode');

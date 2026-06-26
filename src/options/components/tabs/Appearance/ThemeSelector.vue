@@ -43,6 +43,7 @@ const setTheme = (name) => {
     html.style.removeProperty('--bg-sidebar');
     html.style.removeProperty('--bg-card');
     html.style.removeProperty('--accent-primary');
+    html.style.removeProperty('--accent-primary-rgb');
     html.style.removeProperty('--text-primary');
     
     html.classList.remove('dark-mode', 'black-mode', 'neon-mode', 'light-mode');

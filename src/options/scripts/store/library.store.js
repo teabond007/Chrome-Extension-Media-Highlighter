@@ -81,19 +81,47 @@ export const useLibraryStore = defineStore('library', {
          * Removes a manga entry matching by title.
          * @param {Object} entry - The entry object to remove
          */
+        /**
+         * Removes a manga entry matching by title.
+         * @param {Object} entry - The entry object to remove
+         */
         async removeEntry(entry) {
             console.log('[LibraryStore] removeEntry started');
             try {
-                if (!entry?.title) {
+                if (!entry || !entry.title) {
                     console.log('[LibraryStore] Invalid entry passed to removeEntry');
                     return;
                 }
                 
-                const titleToMatch = entry.title.toLowerCase().trim();
-                this.entries = this.entries.filter(e => e && e.title.toLowerCase().trim() !== titleToMatch);
+                var titleToMatch = entry.title.toLowerCase().trim();
+                console.log('[LibraryStore] Removing entry with title:', titleToMatch);
                 
-                await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: this.entries });
-                console.log('[LibraryStore] Removed successfully');
+                // Get latest data from chrome local storage directly to avoid proxy and stale data issues
+                var data = await chrome.storage.local.get([DATA.LIBRARY_ENTRIES]);
+                var rawEntries = data[DATA.LIBRARY_ENTRIES];
+                var currentEntries = Array.isArray(rawEntries) ? rawEntries : [];
+                
+                var updatedEntries = [];
+                for (var i = 0; i < currentEntries.length; i++) {
+                    var currentItem = currentEntries[i];
+                    if (currentItem && currentItem.title) {
+                        var currentTitle = currentItem.title.toLowerCase().trim();
+                        // Only keep items that do NOT match the title we want to delete
+                        if (currentTitle !== titleToMatch) {
+                            updatedEntries.push(currentItem);
+                        }
+                    }
+                }
+                
+                // Convert to plain JS objects to strip any hidden Vue proxies before saving to chrome storage
+                var plainEntries = JSON.parse(JSON.stringify(updatedEntries));
+                
+                // Save updated list back to storage
+                await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: plainEntries });
+                
+                // Update local store state for immediate visual UI update
+                this.entries = plainEntries;
+                console.log('[LibraryStore] Removed successfully, new count:', plainEntries.length);
             } catch (err) {
                 console.error('[LibraryStore] Error in removeEntry:', err);
             }
@@ -104,8 +132,9 @@ export const useLibraryStore = defineStore('library', {
          * @param {Array} entriesList - The array of entries to save.
          */
         async saveEntries(entriesList) {
-            this.entries = entriesList;
-            return await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entriesList });
+            var plainEntries = JSON.parse(JSON.stringify(entriesList));
+            this.entries = plainEntries;
+            return await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: plainEntries });
         },
 
         /**
@@ -195,41 +224,63 @@ export const useLibraryStore = defineStore('library', {
             }
         },
 
+        /**
+         * Sync metadata for entries in the library that are missing AniList data.
+         * @param {Array} entriesList - The current list of entries to scan
+         */
         async fetchMissingMetadata(entriesList) {
-            const missing = entriesList.filter(e => 
-                e && (!e.anilistData || (e.anilistData.id && !e.anilistData.chapters)) &&
-                (!e.lastChecked || (Date.now() - e.lastChecked > 3600000))
-            );
-
-            if (missing.length === 0) return;
-
-            this.syncProgress = { current: 0, total: missing.length, title: 'Starting...' };
-            window.dispatchEvent(new CustomEvent('library-sync-start', { detail: { total: missing.length } }));
-
-            for (let i = 0; i < missing.length; i++) {
-                const liveEntry = missing[i];
-                if (!liveEntry) continue;
-
-                this.syncProgress = { current: i + 1, total: missing.length, title: liveEntry.title };
-                window.dispatchEvent(new CustomEvent('library-sync-progress', {
-                    detail: { current: i + 1, total: missing.length, title: liveEntry.title }
-                }));
-
-                try {
-                    const data = await getMergedMetadata(liveEntry.title, liveEntry.type);
-                    if (data != null) {
-                        liveEntry.anilistData = data;
+            console.log('[LibraryStore] fetchMissingMetadata started');
+            try {
+                var missing = [];
+                for (var i = 0; i < entriesList.length; i++) {
+                    var e = entriesList[i];
+                    if (e) {
+                        var needsAnilist = !e.anilistData || (e.anilistData.id && !e.anilistData.chapters);
+                        var isStale = !e.lastChecked || (Date.now() - e.lastChecked > 3600000);
+                        if (needsAnilist && isStale) {
+                            missing.push(e);
+                        }
                     }
-                    liveEntry.lastChecked = Date.now();
-                    await new Promise(r => setTimeout(r, 600)); // Throttle rate limit
-                } catch (err) {
-                    console.error('Error fetching metadata for', liveEntry.title, err);
                 }
-            }
 
-            await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: entriesList });
-            this.entries = entriesList;
-            window.dispatchEvent(new CustomEvent('library-sync-complete'));
+                if (missing.length === 0) {
+                    return;
+                }
+
+                this.syncProgress = { current: 0, total: missing.length, title: 'Starting...' };
+                window.dispatchEvent(new CustomEvent('library-sync-start', { detail: { total: missing.length } }));
+
+                for (var j = 0; j < missing.length; j++) {
+                    var liveEntry = missing[j];
+                    if (!liveEntry) {
+                        continue;
+                    }
+
+                    this.syncProgress = { current: j + 1, total: missing.length, title: liveEntry.title };
+                    window.dispatchEvent(new CustomEvent('library-sync-progress', {
+                        detail: { current: j + 1, total: missing.length, title: liveEntry.title }
+                    }));
+
+                    try {
+                        var metadata = await getMergedMetadata(liveEntry.title, liveEntry.type);
+                        if (metadata !== null && metadata !== undefined) {
+                            liveEntry.anilistData = metadata;
+                        }
+                        liveEntry.lastChecked = Date.now();
+                        await new Promise(r => setTimeout(r, 600)); // Throttle rate limit
+                    } catch (err) {
+                        console.error('Error fetching metadata for', liveEntry.title, err);
+                    }
+                }
+
+                // Strip proxies to avoid chrome.storage.local serialization bugs
+                var plainEntries = JSON.parse(JSON.stringify(entriesList));
+                await chrome.storage.local.set({ [DATA.LIBRARY_ENTRIES]: plainEntries });
+                this.entries = plainEntries;
+                window.dispatchEvent(new CustomEvent('library-sync-complete'));
+            } catch (err) {
+                console.error('[LibraryStore] Error in fetchMissingMetadata:', err);
+            }
         }
     }
 });

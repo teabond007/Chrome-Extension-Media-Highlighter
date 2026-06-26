@@ -37,6 +37,12 @@ const ICONS = {
 let panelContainer = null;
 let shadowRoot = null;
 
+/** Whether interact mode is active */
+let isInteractMode = false;
+
+/** Last hovered element (tracked passively during interact mode) */
+let lastHoveredElement = null;
+
 /** Current field being assigned (card, title OR readerDetect, readerTitle, readerChapter) */
 let activeField = '';
 
@@ -173,6 +179,11 @@ function getPanelHTML() {
                     <button class="field-tab" data-field="title">${ICONS.FILE} Title<span class="tab-check-icon"></span></button>
                 `}
             </div>
+
+            <div class="mode-toggle-container">
+                <button class="mode-btn active" id="selectModeBtn">Selection Mode</button>
+                <button class="mode-btn" id="interactModeBtn">Interact Mode (F2)</button>
+            </div>
             
             <div id="pathDisplay">
                 <div class="path-display">
@@ -193,7 +204,7 @@ function getPanelHTML() {
             </div>
             
             <div class="instructions">
-                Click to freeze • ▲▼ shift match depth (green) • Confirm to assign
+                Click to freeze • F2 to toggle Interact Mode • Confirm to assign
             </div>
         </div>
     `;
@@ -210,6 +221,15 @@ function attachEventListeners() {
         tab.addEventListener('click', (e) => {
             setActiveField(e.target.dataset.field);
         });
+    });
+
+    // Mode toggle buttons
+    shadowRoot.getElementById('selectModeBtn')?.addEventListener('click', () => {
+        setInteractMode(false);
+    });
+
+    shadowRoot.getElementById('interactModeBtn')?.addEventListener('click', () => {
+        setInteractMode(true);
     });
 
     // Render variant group tabs (initial)
@@ -436,6 +456,7 @@ function escapeHtml(str) {
 function startPicking() {
     document.addEventListener('mouseover', handleMouseOver, true);
     document.addEventListener('click', handleClick, true);
+    document.addEventListener('keydown', handleGlobalKeyDown, true);
 }
 
 /**
@@ -444,6 +465,68 @@ function startPicking() {
 function stopPicking() {
     document.removeEventListener('mouseover', handleMouseOver, true);
     document.removeEventListener('click', handleClick, true);
+    document.removeEventListener('keydown', handleGlobalKeyDown, true);
+}
+
+/**
+ * Handles global keydown events to support hotkey F2 toggling interact mode.
+ * @param {KeyboardEvent} e
+ */
+function handleGlobalKeyDown(e) {
+    if (e.key === 'F2') {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleInteractMode();
+    }
+}
+
+/**
+ * Toggles the interaction mode state, hiding highlights and updating the UI accordingly.
+ */
+function toggleInteractMode() {
+    isInteractMode = !isInteractMode;
+    
+    if (isInteractMode) {
+        highlighter.hideHighlight();
+        lastHoveredElement = null;
+        
+        if (shadowRoot) {
+            shadowRoot.getElementById('selectModeBtn')?.classList.remove('active');
+            shadowRoot.getElementById('interactModeBtn')?.classList.add('active');
+            
+            const pathDisplay = shadowRoot.getElementById('pathDisplay');
+            if (pathDisplay) {
+                pathDisplay.innerHTML = `
+                    <div class="path-display interact-active">
+                        <div class="path-empty">Interact Mode: hover target & press F2 to freeze</div>
+                    </div>
+                `;
+            }
+        }
+    } else {
+        if (lastHoveredElement) {
+            highlighter.highlightElement(lastHoveredElement);
+            highlighter.freezeSelection(lastHoveredElement);
+            updatePathDisplay();
+        } else {
+            highlighter.unfreezeSelection();
+            showAssignedSelector();
+        }
+        
+        if (shadowRoot) {
+            shadowRoot.getElementById('interactModeBtn')?.classList.remove('active');
+            shadowRoot.getElementById('selectModeBtn')?.classList.add('active');
+        }
+    }
+}
+
+/**
+ * Programmatically sets the interaction mode.
+ * @param {boolean} active - True to enable interact mode, false to disable
+ */
+function setInteractMode(active) {
+    if (isInteractMode === active) return;
+    toggleInteractMode();
 }
 
 /**
@@ -453,6 +536,11 @@ function stopPicking() {
 function handleMouseOver(e) {
     const target = e.target;
     if (panelContainer?.contains(target)) return;
+
+    if (isInteractMode) {
+        lastHoveredElement = target;
+        return;
+    }
 
     highlighter.highlightElement(target);
     // Reset generalization index when hovering a new element
@@ -467,6 +555,10 @@ function handleMouseOver(e) {
 function handleClick(e) {
     const target = e.target;
     if (panelContainer?.contains(target)) return;
+
+    if (isInteractMode) {
+        return;
+    }
 
     e.preventDefault();
     e.stopPropagation();
@@ -541,6 +633,9 @@ async function saveConfiguration() {
 export function cleanup() {
     stopPicking();
     highlighter.cleanup();
+
+    isInteractMode = false;
+    lastHoveredElement = null;
 
     if (panelContainer) {
         panelContainer.remove();

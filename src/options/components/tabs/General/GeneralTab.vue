@@ -16,43 +16,52 @@
                     guide-target="guide-general"
                     full-height
                 >
-                    <div class="input-group-vertical">
-                        <SwitchControl 
-                            :id="TOGGLES.QUICK_ACTIONS" 
-                            label="Quick Actions Overlay" 
-                            sub-label="Show actions on hover (external sites & library)"
-                            v-model="quickActions"
-                        />
+                    <div class="toggles-grid">
+                        <div class="input-group-vertical">
+                            <SwitchControl 
+                                :id="TOGGLES.QUICK_ACTIONS" 
+                                label="Quick Actions Overlay" 
+                                sub-label="Show actions on hover (external sites & library)"
+                                v-model="quickActions"
+                            />
 
-                        <SwitchControl 
-                            :id="TOGGLES.FAMILY_FRIENDLY" 
-                            label="Family Friendly Mode" 
-                            sub-label="Filter out Ecchi and Hentai tags from library"
-                            v-model="familyFriendlyEnabled"
-                            margin-top
-                        />
-                        <SwitchControl 
-                            :id="TOGGLES.LIBRARY_SHOW_RIBBONS" 
-                            label="Show Status Ribbons" 
-                            sub-label="Show corner status banners on all platforms"
-                            v-model="libraryShowRibbons"
-                            margin-top
-                        />
-                        <SwitchControl 
-                            :id="TOGGLES.PROGRESS_TRACKING" 
-                            label="Auto-Save Progress" 
-                            sub-label="Automatically save chapter progress while reading"
-                            v-model="progressTracking"
-                            margin-top
-                        />
-                        <SwitchControl 
-                            :id="TOGGLES.READER_STATUS_PICKER" 
-                            label="Reader Status Picker" 
-                            sub-label="Show a floating status button on reader pages to quickly change reading status"
-                            v-model="readerStatusPicker"
-                            margin-top
-                        />
-
+                            <SwitchControl 
+                                :id="TOGGLES.FAMILY_FRIENDLY" 
+                                label="Family Friendly Mode" 
+                                sub-label="Filter out Ecchi and Hentai tags from library"
+                                v-model="familyFriendlyEnabled"
+                                margin-top
+                            />
+                            <SwitchControl 
+                                :id="TOGGLES.LIBRARY_SHOW_RIBBONS" 
+                                label="Show Status Ribbons" 
+                                sub-label="Show corner status banners on all platforms"
+                                v-model="libraryShowRibbons"
+                                margin-top
+                            />
+                        </div>
+                        <div class="input-group-vertical">
+                            <SwitchControl 
+                                :id="TOGGLES.PROGRESS_TRACKING" 
+                                label="Auto-Save Progress" 
+                                sub-label="Automatically save chapter progress while reading"
+                                v-model="progressTracking"
+                            />
+                            <SwitchControl 
+                                :id="TOGGLES.READER_STATUS_PICKER" 
+                                label="Reader Status Picker" 
+                                sub-label="Show a floating status button on reader pages to quickly change reading status"
+                                v-model="readerStatusPicker"
+                                margin-top
+                            />
+                            <SwitchControl 
+                                :id="TOGGLES.LIBRARY_HIDE_NO_HISTORY" 
+                                label="Only Show with History" 
+                                sub-label="Hide entries with no progress" 
+                                v-model="libraryHideNoHistory"
+                                margin-top
+                            />
+                        </div>
                     </div>
                 </SettingsCard>
             </div>
@@ -80,7 +89,8 @@ const {
     progressTracking,
     familyFriendlyEnabled,
     libraryShowRibbons,
-    readerStatusPicker
+    readerStatusPicker,
+    libraryHideNoHistory
 } = storeToRefs(settingsStore);
 
 const bindSetting = (refValue, key) => {
@@ -92,6 +102,7 @@ bindSetting(progressTracking, 'progressTracking');
 bindSetting(familyFriendlyEnabled, 'familyFriendlyEnabled');
 bindSetting(libraryShowRibbons, 'libraryShowRibbons');
 bindSetting(readerStatusPicker, 'readerStatusPicker');
+bindSetting(libraryHideNoHistory, 'libraryHideNoHistory');
 </script>
 
 <style scoped lang="scss">
@@ -99,6 +110,17 @@ bindSetting(readerStatusPicker, 'readerStatusPicker');
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1rem;
+}
+
+.toggles-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
 }
 
 .input-group-vertical {

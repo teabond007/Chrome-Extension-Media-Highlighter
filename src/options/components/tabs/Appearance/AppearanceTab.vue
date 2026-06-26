@@ -46,15 +46,6 @@
                         sub-label="Show colored borders on all sites and library" 
                         v-model="libraryBordersEnabled"
                     />
-                    <SwitchControl 
-                        :id="TOGGLES.LIBRARY_HIDE_NO_HISTORY" 
-                        label="Only Show with History" 
-                        sub-label="Hide entries with no progress" 
-                        v-model="libraryHideNoHistory"
-                    />
-
-
-
                 </SettingsCard>
             </div>
         </div>
@@ -78,7 +69,6 @@ const {
     highlightThickness,
     borderStyle,
     libraryBordersEnabled,
-    libraryHideNoHistory,
 } = storeToRefs(settingsStore);
 
 const bindSetting = (refValue, key) => {
@@ -88,8 +78,6 @@ const bindSetting = (refValue, key) => {
 };
 
 bindSetting(libraryBordersEnabled, 'libraryBordersEnabled');
-
-bindSetting(libraryHideNoHistory, 'libraryHideNoHistory');
 
 
 
